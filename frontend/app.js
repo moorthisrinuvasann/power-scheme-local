@@ -478,6 +478,11 @@ document.getElementById('downloadBtn').onclick = function() {
             return;
         }
 
+        // ── Required variables ──────────────────────────────────────────────
+        var dateStr    = new Date().toLocaleString();
+        var summary    = lastGeneratedData.final_summary || 'No summary available.';
+        var schemesHtml = '';
+
         // ── Build Comparison Table for report ──────────────────────────────
         var comparisonHtml = '';
         var cmp = lastGeneratedData.comparison || [];
