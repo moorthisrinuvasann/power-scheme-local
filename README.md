@@ -6,13 +6,58 @@ An intelligent full-stack web application that automatically generates professio
 
 ## 📸 Features
 
-- **AI-Driven Design**: Uses OpenRouter LLM to analyze power requirements and generate 3 optimized power schemes
-- **Per-Rail Engineering Analysis**: Ripple voltage, PSRR, and thermal calculations for **every individual output rail**
+- **3-Agent AI Pipeline**: Three specialized LLM agents each handle a narrow focused task (see architecture below)
+- **Live Progress Streaming**: Real-time Server-Sent Events show each agent step as it completes
+- **Per-Rail Engineering Analysis**: Ripple voltage, PSRR, and thermal calculations for **every individual output rail** using real Python math
 - **Interactive Schematics**: Auto-rendered Mermaid.js block diagrams showing the power distribution tree
 - **Component Selection**: Picks optimal Buck Converters and LDOs from a local SQLite datasheet database with 1.5–1.75× current derating
 - **Professional HTML Report**: Downloadable engineering report with Mermaid diagrams, calculation tables, and executive summary
 - **Dual Input Mode**: Paste requirements directly in the textarea or upload a `.txt`/`.csv`/`.json` file
 - **Thermal Validation**: Junction temperature estimates using `Tj = Ta + (Pdiss × Rθja)` from datasheet values
+
+## 🏗️ Agent Architecture
+
+```
+User Requirements
+      │
+      ▼
+┌─────────────────────────────────────────────────────────┐
+│  AGENT 1: Component Selector  🔍                        │
+│  - Queries SQLite component database                    │
+│  - Applies 1.5–1.75× current derating                  │
+│  - Proposes 3 different scheme options                  │
+│  - Accounts for indirect LDO load currents             │
+└───────────────────────┬─────────────────────────────────┘
+                        │ component_selections per scheme
+                        ▼
+┌─────────────────────────────────────────────────────────┐
+│  AGENT 2: Topology Designer  🏗️                         │
+│  - Designs power distribution tree                      │
+│  - Assigns v_in for each rail                           │
+│  - Identifies upstream Buck for each LDO               │
+│  - Selects dropout-aware LDO input sources             │
+└───────────────────────┬─────────────────────────────────┘
+                        │ rail_assignments with full topology
+                        ▼
+┌─────────────────────────────────────────────────────────┐
+│  AGENT 3: Schematic Generator  📐                       │
+│  - Generates Mermaid diagram code only                  │
+│  - Uses exact IC part numbers as node labels            │
+│  - Shows voltage/current on edges                       │
+└───────────────────────┬─────────────────────────────────┘
+                        │ mermaid_code per scheme
+                        ▼
+┌─────────────────────────────────────────────────────────┐
+│  PYTHON CALCULATOR  🧮  (no LLM — real math)           │
+│  Buck Ripple: ΔV = ΔIL / (8 × f × C)                  │
+│  LDO Ripple:  V_out = V_in_rip / 10^(PSRR/20)         │
+│  Thermal:     Tj = Ta + Pdiss × Rθja                   │
+└───────────────────────┬─────────────────────────────────┘
+                        │ accurate rail_analysis per rail
+                        ▼
+              Final JSON Response
+     (streamed live via Server-Sent Events)
+```
 
 ---
 
@@ -193,6 +238,14 @@ All three are evaluated for **Pass / Fail** against the input requirements.
 ---
 
 ## 📦 Version History
+
+### v1.4.0 — 2026-04-24 *(Phase 2: Multi-Agent Pipeline)*
+- ✅ **Agent 1 — Component Selector**: Dedicated LLM call focused solely on selecting the optimal Buck/LDO for each rail. Applies 1.5–1.75× derating, accounts for indirect load currents, and proposes 3 scheme variants
+- ✅ **Agent 2 — Topology Designer**: Separate LLM call that designs the full power distribution tree — assigns `v_in` per rail, identifies upstream Buck for each LDO, selects dropout-aware LDO input rails
+- ✅ **Agent 3 — Schematic Generator**: Focused single-task LLM call generating only Mermaid diagrams with exact IC part numbers and voltage/current edge labels
+- ✅ **Live SSE Progress Streaming**: Backend streams Server-Sent Events to the browser — users see each agent step in real time with a progress bar and step chips (🔍 → 🏗️ → 📐 → 🧮)
+- ✅ **Python Calculator Integration**: Real engineering math (ripple, PSRR, thermal) injected after LLM topology decisions — no LLM estimation
+- ✅ **Progress Panel Reset**: Agent step chips clear automatically on each new generation
 
 ### v1.3.0 — 2026-04-24
 - ✅ **Per-Rail Engineering Analysis**: Ripple, PSRR, and Thermal calculated individually for every voltage rail

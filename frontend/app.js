@@ -36,6 +36,11 @@ document.getElementById('generateBtn').onclick = function() {
     document.getElementById('loader').classList.remove('hidden');
     document.getElementById('results').classList.add('hidden');
     document.getElementById('generateBtn').disabled = true;
+
+    // Reset any previous progress panel
+    var old = document.getElementById('agentProgress');
+    if (old) old.remove();
+
     updateProgress(0, 4, 'Starting AI agent pipeline...');
 
     var blob = new Blob([reqText], { type: 'text/plain' });
