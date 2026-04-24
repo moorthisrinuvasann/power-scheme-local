@@ -1,0 +1,224 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Power Scheme Final Report</title>
+    <style>
+        body { font-family: system-ui, -apple-system, sans-serif; line-height: 1.6; max-width: 1200px; margin: 0 auto; padding: 2rem; color: #1e293b; background: #f8fafc; }
+        h1 { color: #3b82f6; border-bottom: 2px solid #cbd5e1; padding-bottom: 0.5rem; }
+        h2 { color: #475569; margin-top: 1rem; }
+        .card, .result-card { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); }
+        .scheme-block { margin-bottom: 4rem; padding: 2rem; border: 3px solid #cbd5e1; border-radius: 12px; background: #ffffff; }
+        .results-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; }
+        @media (max-width: 800px) { .results-grid { grid-template-columns: 1fr; } }
+        .component-item { margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid #e2e8f0; }
+        .component-item:last-child { border-bottom: none; }
+        .comp-header { display: flex; justify-content: space-between; align-items: center; }
+        .comp-title { font-weight: bold; font-size: 1.1rem; }
+        .comp-price { background: #10b981; color: white; padding: 0.2rem 0.6rem; border-radius: 9999px; font-size: 0.85rem; }
+        .comp-reason { margin-top: 0.5rem; color: #64748b; }
+        .thermal-table { width: 100%; border-collapse: collapse; margin-top: 0.5rem; }
+        .thermal-table th, .thermal-table td { padding: 0.75rem 1rem; text-align: left; border-bottom: 1px solid #e2e8f0; font-size: 0.95rem; }
+        .thermal-table th { font-weight: bold; background: #f1f5f9; }
+        .status-pass { color: #10b981; font-weight: bold; }
+        .status-fail { color: #ef4444; font-weight: bold; }
+        .diagram-card { text-align: center; }
+        .diagram-card svg { max-width: 100%; height: auto; }
+        footer { margin-top: 3rem; text-align: center; color: #94a3b8; font-size: 0.9rem; }
+    </style>
+</head>
+<body>
+    <h1>Extensive Power Scheme Report</h1>
+    <p>Generated on: 4/18/2026, 12:56:46 AM</p>
+    
+    <div class="card" style="background:#eef2ff; border-color:#818cf8;">
+        <h2>Executive Summary & Comparison</h2>
+        <p>Three viable power architecturing options are presented. Scheme 1 uses the fewest components (2 buck converters + 2 LDOs) with a moderate total cost. Scheme 2 adds an extra buck for the 1.8 V rail but keeps LDOs minimal, raising cost slightly. Scheme 3 eliminates LDOs entirely by using additional buck converters for all rails, resulting in the highest part count and cost.</p>
+    </div>
+
+    
+                        <div class="scheme-block" style="margin-bottom: 3rem; border: 2px solid var(--primary); padding: 2rem; border-radius: 16px; background: rgba(30, 41, 59, 0.4);">
+                            <h2 style="color: var(--primary); font-size: 1.8rem; margin-bottom: 1rem;">Scheme 1 - Minimal Buck + LDO <span style="font-size: 1rem; color: #10b981;">(Total: INR 16650)</span></h2>
+                            
+                            <div class="result-card diagram-card" style="margin-bottom: 1.5rem;">
+                                <h2>Schematics (Mermaid)</h2>
+                                <div class="mermaid-view">Error rendering mermaid diagram</div>
+                            </div>
+
+                            <div class="results-grid">
+                                <div class="result-card">
+                                    <h2>Selected Components</h2>
+                                    <div class="component-list">
+                            <div class="component-item">
+                                <div class="comp-header">
+                                    <span class="comp-title">LTM4671</span>
+                                    <span class="comp-price">INR 6000</span>
+                                </div>
+                                <div class="comp-reason">Provides 3.3V, 5V, 1.2V and 0.85V outputs with required currents; reduces part count</div>
+                            </div>
+                        
+                            <div class="component-item">
+                                <div class="comp-header">
+                                    <span class="comp-title">LTM4650-1</span>
+                                    <span class="comp-price">INR 10000</span>
+                                </div>
+                                <div class="comp-reason">Supplies 0.9V at 40A high‑current requirement</div>
+                            </div>
+                        
+                            <div class="component-item">
+                                <div class="comp-header">
+                                    <span class="comp-title">ADP7159</span>
+                                    <span class="comp-price">INR 650</span>
+                                </div>
+                                <div class="comp-reason">Generates 1.8V from 3.3V rail, low noise, adequate current</div>
+                            </div>
+                        
+                            <div class="component-item">
+                                <div class="comp-header">
+                                    <span class="comp-title">TPS7A85A</span>
+                                    <span class="comp-price">Price N/A</span>
+                                </div>
+                                <div class="comp-reason">Generates 1V from 3.3V rail, ultra‑low noise, no cost</div>
+                            </div>
+                        </div>
+                                </div>
+                                
+                                <div style="display:flex; flex-direction:column; gap:1.5rem;">
+                                    <div class="result-card" style="margin:0;">
+                                        <h2>Specifications (Ripple, PSRR, Freq)</h2>
+                                        <table class="thermal-table"><thead><tr><th>Parameter</th><th>Value</th><th>Status</th></tr></thead><tbody><tr><td>Switching Frequency</td><td>1.5MHz</td><td>Info</td></tr><tr><td>Voltage Ripple</td><td>12mV</td><td>Pass</td></tr><tr><td>PSRR</td><td>38dB</td><td>Pass</td></tr></tbody></table>
+                                    </div>
+                                    <div class="result-card" style="margin:0;">
+                                        <h2>Thermal Verification</h2>
+                                        <table class="thermal-table"><thead><tr><th>Parameter</th><th>Value</th><th>Status</th></tr></thead><tbody><tr><td>LTM4671 Est. Junction Temp</td><td>152°C</td><td class="status-fail">Fail</td></tr><tr><td>LTM4650-1 Est. Junction Temp</td><td>133°C</td><td class="status-pass">Pass</td></tr><tr><td>ADP7159 Est. Junction Temp</td><td>100°C</td><td class="status-pass">Pass</td></tr><tr><td>TPS7A85A Est. Junction Temp</td><td>95°C</td><td class="status-pass">Pass</td></tr></tbody></table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    
+                        <div class="scheme-block" style="margin-bottom: 3rem; border: 2px solid var(--primary); padding: 2rem; border-radius: 16px; background: rgba(30, 41, 59, 0.4);">
+                            <h2 style="color: var(--primary); font-size: 1.8rem; margin-bottom: 1rem;">Scheme 2 - Extra Buck for 1.8V <span style="font-size: 1rem; color: #10b981;">(Total: INR 19000)</span></h2>
+                            
+                            <div class="result-card diagram-card" style="margin-bottom: 1.5rem;">
+                                <h2>Schematics (Mermaid)</h2>
+                                <div class="mermaid-view">Error rendering mermaid diagram</div>
+                            </div>
+
+                            <div class="results-grid">
+                                <div class="result-card">
+                                    <h2>Selected Components</h2>
+                                    <div class="component-list">
+                            <div class="component-item">
+                                <div class="comp-header">
+                                    <span class="comp-title">LTM4671</span>
+                                    <span class="comp-price">INR 6000</span>
+                                </div>
+                                <div class="comp-reason">Provides 3.3V, 5V, 1.2V and 0.85V outputs; feeds LDOs</div>
+                            </div>
+                        
+                            <div class="component-item">
+                                <div class="comp-header">
+                                    <span class="comp-title">LTM4650-1</span>
+                                    <span class="comp-price">INR 10000</span>
+                                </div>
+                                <div class="comp-reason">Supplies 0.9V at 40A high‑current requirement</div>
+                            </div>
+                        
+                            <div class="component-item">
+                                <div class="comp-header">
+                                    <span class="comp-title">LTM4638</span>
+                                    <span class="comp-price">INR 3000</span>
+                                </div>
+                                <div class="comp-reason">Generates 1.8V rail directly, 15A capability sufficient</div>
+                            </div>
+                        
+                            <div class="component-item">
+                                <div class="comp-header">
+                                    <span class="comp-title">LTM3070</span>
+                                    <span class="comp-price">Price N/A</span>
+                                </div>
+                                <div class="comp-reason">Generates 1V rail from 3.3V, zero‑cost adjustable regulator</div>
+                            </div>
+                        </div>
+                                </div>
+                                
+                                <div style="display:flex; flex-direction:column; gap:1.5rem;">
+                                    <div class="result-card" style="margin:0;">
+                                        <h2>Specifications (Ripple, PSRR, Freq)</h2>
+                                        <table class="thermal-table"><thead><tr><th>Parameter</th><th>Value</th><th>Status</th></tr></thead><tbody><tr><td>Switching Frequency</td><td>1.5MHz</td><td>Info</td></tr><tr><td>Voltage Ripple</td><td>12mV</td><td>Pass</td></tr><tr><td>PSRR</td><td>38dB</td><td>Pass</td></tr></tbody></table>
+                                    </div>
+                                    <div class="result-card" style="margin:0;">
+                                        <h2>Thermal Verification</h2>
+                                        <table class="thermal-table"><thead><tr><th>Parameter</th><th>Value</th><th>Status</th></tr></thead><tbody><tr><td>LTM4671 Est. Junction Temp</td><td>152°C</td><td class="status-fail">Fail</td></tr><tr><td>LTM4650-1 Est. Junction Temp</td><td>133°C</td><td class="status-pass">Pass</td></tr><tr><td>LTM4638 Est. Junction Temp</td><td>115°C</td><td class="status-pass">Pass</td></tr><tr><td>LTM3070 Est. Junction Temp</td><td>90°C</td><td class="status-pass">Pass</td></tr></tbody></table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    
+                        <div class="scheme-block" style="margin-bottom: 3rem; border: 2px solid var(--primary); padding: 2rem; border-radius: 16px; background: rgba(30, 41, 59, 0.4);">
+                            <h2 style="color: var(--primary); font-size: 1.8rem; margin-bottom: 1rem;">Scheme 3 - All Buck, No LDO <span style="font-size: 1rem; color: #10b981;">(Total: INR 21200)</span></h2>
+                            
+                            <div class="result-card diagram-card" style="margin-bottom: 1.5rem;">
+                                <h2>Schematics (Mermaid)</h2>
+                                <div class="mermaid-view">Error rendering mermaid diagram</div>
+                            </div>
+
+                            <div class="results-grid">
+                                <div class="result-card">
+                                    <h2>Selected Components</h2>
+                                    <div class="component-list">
+                            <div class="component-item">
+                                <div class="comp-header">
+                                    <span class="comp-title">LTM4671</span>
+                                    <span class="comp-price">INR 6000</span>
+                                </div>
+                                <div class="comp-reason">Provides 3.3V, 5V, 1.2V and 0.85V outputs</div>
+                            </div>
+                        
+                            <div class="component-item">
+                                <div class="comp-header">
+                                    <span class="comp-title">LTM4650-1</span>
+                                    <span class="comp-price">INR 10000</span>
+                                </div>
+                                <div class="comp-reason">Supplies 0.9V at 40A high‑current requirement</div>
+                            </div>
+                        
+                            <div class="component-item">
+                                <div class="comp-header">
+                                    <span class="comp-title">LTM4638</span>
+                                    <span class="comp-price">INR 3000</span>
+                                </div>
+                                <div class="comp-reason">Generates 1.8V rail (15A capability)</div>
+                            </div>
+                        
+                            <div class="component-item">
+                                <div class="comp-header">
+                                    <span class="comp-title">LTM4622</span>
+                                    <span class="comp-price">INR 2200</span>
+                                </div>
+                                <div class="comp-reason">Generates 1V rail (up to 5A, sufficient for 0.7A load)</div>
+                            </div>
+                        </div>
+                                </div>
+                                
+                                <div style="display:flex; flex-direction:column; gap:1.5rem;">
+                                    <div class="result-card" style="margin:0;">
+                                        <h2>Specifications (Ripple, PSRR, Freq)</h2>
+                                        <table class="thermal-table"><thead><tr><th>Parameter</th><th>Value</th><th>Status</th></tr></thead><tbody><tr><td>Switching Frequency</td><td>1.5MHz</td><td>Info</td></tr><tr><td>Voltage Ripple</td><td>12mV</td><td>Pass</td></tr><tr><td>PSRR</td><td>38dB</td><td>Pass</td></tr></tbody></table>
+                                    </div>
+                                    <div class="result-card" style="margin:0;">
+                                        <h2>Thermal Verification</h2>
+                                        <table class="thermal-table"><thead><tr><th>Parameter</th><th>Value</th><th>Status</th></tr></thead><tbody><tr><td>LTM4671 Est. Junction Temp</td><td>152°C</td><td class="status-fail">Fail</td></tr><tr><td>LTM4650-1 Est. Junction Temp</td><td>133°C</td><td class="status-pass">Pass</td></tr><tr><td>LTM4638 Est. Junction Temp</td><td>115°C</td><td class="status-pass">Pass</td></tr><tr><td>LTM4622 Est. Junction Temp</td><td>140°C</td><td class="">Marginal</td></tr></tbody></table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    
+
+    <footer>
+        Generated by AI Power Scheme System
+    </footer>
+</body>
+</html>

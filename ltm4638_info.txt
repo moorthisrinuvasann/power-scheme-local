@@ -1,0 +1,198 @@
+LTM4638
+1
+Rev. D For more information www.analog.comTYPICAL APPLICATION FEATURES DESCRIPTION20V IN, 15A Step-Down DC/DC 
+µModule Regulator
+The LTM®4638  is a complete 15A step-down switch -
+ing mode µModule (power module) regulator in a tiny 
+6.25mm  × 6.25mm  × 5.02mm  BGA package. Included 
+in the package are the switching controller , power FETs, 
+inductor and support components. Operating over an 
+input voltage range of 3.1V to 20V, the LTM4638  sup-
+ports an output voltage range of 0.6V to 5.5V, set by a 
+single external resistor . Its high efficiency design delivers 
+up to 15A continuous output current. Only bulk input and 
+output capacitors are needed. The LTM4638  product video 
+is available on the website.  
+The LTM4638  supports selectable discontinuous mode 
+operation and output voltage tracking for supply rail se -
+quencing. Its high switching frequency and current mode 
+control enable a very fast transient response to line and 
+load changes without sacrificing stability.
+Fault protection features include overvoltage, overcurrent 
+and overtemperature protection. 
+The LTM4638  is available with SnPb or RoHS compliant 
+terminal finish.
+15A, 1.0V Output DC/DC µModule® Step-Down Regulator1.0V Output Efficiency vs Load CurrentAPPLICATIONS nComplete Solution in <1cm2 (Single-Sided PCB) or 
+0.5cm2 (Dual-Sided PCB)
+ n6.25mm  × 6.25mm  × 5.02mm  BGA Package
+ nWide Input Voltage Range : 3.1V to 20V 
+ n0.6V to 5.5V Output Voltage
+ n15A DC Output Current
+ n±1.5% Maximum Total DC Output Voltage Error  
+Over Line, Load and Temperature
+ nDifferential Remote Sensing Amp
+ nCurrent Mode Control, Fast T ransient Response
+ nExternal Frequency Synchronization
+ nMultiphase Parallel Current Sharing with  
+Multiple  LTM4638 s
+ nOutput Voltage T racking
+ nSelectable Discontinuous Mode
+ nPower Good Indicator
+ nOvervoltage, Overcurrent and Overtemperature  
+Protection 
+ nTelecom, Datacom, Networking and  
+Industrial Equipment
+ nMedical Diagnostic Equipment
+ nData Storage Rack Units and Cards
+ nTest and Debug SystemsAll registered trademarks and trademarks are the property of their respective owners.
+90.9k
+4638 TA01a22µF
+25VVIN
+3.1V TO 20VVOUT
+1.0V
+15A 100µF
+6.3V
+x2
+0.1µFVIN
+RUN
+INTV CC
+MODE/CLKIN
+TRACK/SS
+FREQVOUT
+VOSNS+PHMODE CLKOUT
+PGOOD
+COMPa
+COMPb
+FB
+GNDL TM4638
+VOSNS–
+LOAD CURRENT (A)0EFFICIENCY (%)808590
+15
+4638 TA01b75
+3 6 9 127095
+VIN = 5V , 600kHz
+VIN = 12V , 600kHz
+Document FeedbackClick to view associated Video Design Idea.
+LTM4638
+2
+Rev. D For more information www.analog.comPIN CONFIGURATION ABSOLUTE MAXIMUM RATINGS
+VIN ............................................................. –0.3V to 22V
+VOUT ............................................................. –0.3V to 6V
+INTV CC ...................................................... –0.3V to 3.6V
+RUN ............................................................ –0.3V to V IN 
+PGOOD, FREQ, COMPa, COMPb,
+PHMODE, CLKOUT, FB  .............................. –0.3V to 3.6V
+MODE/CLKIN, TRACK/SS  ..................... –0.3V to INTV CC
+VOSNS+ ......................................................... –0.3V to 6V
+VOSNS– ...................................................... –0.3V to 0.3V
+Internal Operating Temperature Range
+(Notes 2, 5)  ............................................ –40°C to 125°C
+Storage Temperature Range  .................. –55°C to 125°C
+Peak Solder Reflow Body Temperature  ................. 250°C(Note 1) (See Pin Functions , Pin Configuration Table)
+BGA PACKAGE
+49-LEAD (6.25mm × 6.25mm × 5.02mm)
+TJMAX  = 125°C, θ JCtop  = 10°C/W , θ JCbottom  = 4.2°C/W , θ JA = 16°C/WTOP VIEW
+5
+12347
+6
+A B C D E F G
+NOTE:
+1) θ VALUES ARE DETERMINED BY SIMULATION PER JESD51 CONDITIONS, WEIGHT 660mg
+2) θJA VALUE IS OBTAINED WITH DEMO BOARD
+3) REFER TO PAGES 21, 22 FOR LAB MEASUREMENT AND DE-RATING INFORMATION 
+VOUTVINPHMODEGNDTSENSE –
+TSENSE +SW
+CLKOUT
+COMPb
+FREQVOSNS –MODE/CLKIN
+TRACK/SS
+VOSNS +INTV CCRUNPGOOD
+FB
+COMPaVOUT
+ORDER INFORMATION
+PART NUMBER PAD OR BALL FINISHPART MARKING*PACKAGE  
+TYPEMSL  
+RATINGTEMPERATURE RANGE 
+(NOTE 2) DEVICE FINISH CODE
+LTM4638 EY#PBF SAC305  (RoHS) 4638 e1 BGA 3 –40°C to 125°C
+LTM4638 IY#PBF SAC305  (RoHS) 4638 e1 BGA 3 –40°C to 125°C
+LTM4638 IY SnPb 4638 e0 BGA 3 –40°C to 125°C
+• Contact the factory for parts specified with wider operating temperature  
+ranges. *Pad or ball finish code is per IPC/JEDEC J-STD-609.• Recommended LGA and BGA PCB Assembly and 
+Manufacturing Procedures
+• LGA and BGA Package and Tray Drawings
+LTM4638
+3
+Rev. D For more information www.analog.comELECTRICAL CHARACTERISTICS The l denotes the specifications which apply over the specified internal 
+operating temperature range (Note 2), otherwise specifications are at T A = 25°C. VIN = 12V per the typical application shown on the 
+front page.
+SYMBOL PARAMETER CONDITIONS MIN TYP MAX UNITS
+Switching Regulator Section : per Channel
+VIN Input DC Voltage l 3.1 20 V
+VOUT Output Voltage Range l 0.6 5.5 V
+VOUT(DC) Output Voltage, Total 
+Variation with Line and Load  
+(Note 6)CIN = 22µF , COUT = 100µF  Ceramic, R FB = 40.2k ,  
+MODE = INTV CC, IOUT = 0A to 15A (Note 3)  
+   –40°C to 125°C 
+ 
+l 
+ 
+1.477 
+ 
+1.50 
+ 
+1.523 
+ 
+V
+VRUN RUN Pin On Threshold VRUN Rising 1.1 1.25 1.35 V
+IQ(VIN) Input Supply Bias Current VIN = 12V, VOUT = 1.5V, MODE = INTV CC 
+VIN = 12V, VOUT = 1.5V, MODE = GND  
+Shutdown, RUN = 0, V IN = 12V100 
+18 
+20 mA 
+mA 
+µA
+IS(VIN) Input Supply Current VIN = 12V, VOUT = 1.5V, IOUT = 15A 2.3 A
+IOUT(DC) Output Continuous Current 
+RangeVIN = 12V, VOUT = 1.5V 0 15 A
+ΔVOUT (Line)/V OUT Line Regulation Accuracy VOUT = 1.5V, VIN = 3.1V to 20V, IOUT = 0A l 0.04 0.15 %/V
+ΔVOUT (Load)/V OUT Load Regulation Accuracy VOUT = 1.5V, IOUT = 0A to 15A l 0.5 1.2 %
+VOUT(AC) Output Ripple Voltage IOUT = 0A, COUT = 100µF  Ceramic, V IN = 12V,  
+VOUT = 1.5V5 mV
+ΔVOUT(START) Turn-On Overshoot IOUT = 0A, COUT = 100µF  Ceramic, V IN = 12V,  
+VOUT = 1.5V 30 mV
+tSTART Turn-On Time COUT = 100µF  Ceramic, No Load, TRACK/SS = 0.01µF , 
+VIN = 12V, VOUT = 1.5V2.5 ms
+ΔVOUTLS Peak Deviation for Dynamic 
+LoadLoad : 0% to 50% to 0% of Full Load, C OUT = 47µF  
+Ceramic, V IN = 12V, VOUT = 1.5V 160 mV
+tSETTLE Settling Time for Dynamic 
+Load StepLoad : 0% to 50% to 0% of Full Load, C OUT = 47µF  
+Ceramic, V IN = 12V, VOUT = 1.5V 40 µs
+IOUTPK Output Current Limit VIN = 12V, VOUT = 1.5V 18 A
+VFB Voltage at FB Pin IOUT = 0A, VOUT = 1.5V l 0.594 0.60 0.606 V
+IFB Current at FB Pin (Note 4) ±30 nA
+RFBHI Resistor Between V OUT and 
+FB Pins60.05 60.40 60.75 kΩ
+ITRACK/SS T rack Pin Soft-Start Pull-Up 
+CurrentTRACK/SS = 0V 6 10 µA
+VIN(UVLO) VIN Undervoltage Lockout VIN Falling  
+VIN Hysteresis2.5 2.6 
+2502.7 V 
+mV
+tON(MIN) Minimum On-Time (Note 4) 25 ns
+tOFF(MIN) Minimum Off-Time (Note 4) 50 ns
+VPGOOD PGOOD T rip Level VFB With Respect to Set Output  
+   VFB Ramping Negative  
+   VFB Ramping Positive 
+–12 
+5 
+–8 
+8 
+–5 
+12 
+% 
+%
+IPGOOD PGOOD Leakage 2 µA
+VPGL PGOOD Voltage Low IPGOOD  = 1mA 0.02 0.1 V
