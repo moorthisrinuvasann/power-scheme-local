@@ -1,162 +1,174 @@
 import json
+import re
 import sqlite3
-import os
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.responses import JSONResponse, FileResponse
-from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 from openai import AsyncOpenAI
-from pydantic import BaseModel
-from typing import Optional
+from backend.calculator import calculate_all_rails
 
 app = FastAPI()
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 DB_PATH = "components.db"
 
+# ── Component DB ──────────────────────────────────────────────────────────────
 def get_all_components():
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("SELECT part_name, category, price, bug_details, summary_text FROM components")
     rows = cursor.fetchall()
     conn.close()
-    
-    components = []
-    for row in rows:
-        components.append({
-            "part_name": row[0],
-            "category": row[1],
-            "price": row[2],
-            "bug_details": row[3],
-            "summary": row[4][:1000] if row[4] else "" # Truncate summary to save tokens
-        })
-    return components
+    return [{"part_name": r[0], "category": r[1], "price": r[2],
+             "bug_details": r[3], "summary": (r[4] or "")[:800]} for r in rows]
 
+# ── Parse requirements from text ──────────────────────────────────────────────
+def parse_requirements(text: str) -> dict:
+    """Extract numeric values from free-text requirements."""
+    req = {"ta": 85, "ripple_mv": 15, "psrr_db": 35}
+    m = re.search(r'[Aa]mbient\s*[Tt]emp[^:]*:\s*([\d.]+)', text)
+    if m: req["ta"] = float(m.group(1))
+    m = re.search(r'[Rr]ipple[^:]*:\s*<?\s*([\d.]+)\s*m[Vv]', text)
+    if m: req["ripple_mv"] = float(m.group(1))
+    m = re.search(r'PSRR[^:]*:\s*>?\s*([\d.]+)\s*d[Bb]', text)
+    if m: req["psrr_db"] = float(m.group(1))
+    return req
+
+# ── Main API endpoint ─────────────────────────────────────────────────────────
 @app.post("/api/generate")
-async def generate_scheme(
-    file: UploadFile = File(...),
-    api_key: str = Form(...)
-):
+async def generate_scheme(file: UploadFile = File(...), api_key: str = Form(...)):
     if not api_key:
         raise HTTPException(status_code=400, detail="OpenRouter API key is required.")
-        
+
     try:
         content = await file.read()
         requirements = content.decode('utf-8')
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Error reading file: {e}")
-        
+
+    req_params = parse_requirements(requirements)
     components = get_all_components()
     components_json = json.dumps(components, indent=2)
 
+    # ── Simplified LLM prompt: topology + components + mermaid ONLY ───────────
     prompt = f"""
-You are an expert power electronics engineer. The user has provided the following electrical requirements for a power scheme:
+You are an expert power electronics engineer. The user has provided the following electrical requirements:
 {requirements}
 
-Here is a list of available components in the database, including their category, price, known bugs, and a summary of their datasheet specs:
+Available components in the database:
 {components_json}
 
-CRITICAL constraint instructions:
-1. Use buck converter & LDO's. For LDO, buck converter output voltage rails should be used as input.
-2. Ensure the in-direct load current also added to respective source load for both buck & LDO.
-3. Provide the thermal rise (estimated junction temperature value) based on worst case efficiency for buck converter and LDO's & consider thermal resistance value from data sheet.
-4. Calculate and verify the PSRR (Power Supply Rejection Ratio) and Voltage ripple by reading from the data sheets and add the same in combined power scheme comparison and final summary.
-5. Add the switching frequency in the combined power scheme comparison and final summary.
-6. Use splitting into multiple smaller converters if thermal constraints failed, consider the space constraints and size of the converter if required use different converters.
-7. While selecting buck or LDO consider 1.5 to 1.75 times deration in current rating.
-8. While choosing the input voltage for LDO consider for minimum dropout voltage requirement and drop out voltage should be minimum.
-10. CRITICAL: Buck Converters like the LTM4638 are strictly SINGLE-OUTPUT devices. They can only generate ONE voltage level out. If the requirement specifies multiple different voltage rails (e.g., 8 different outputs), you CANNOT draw them coming directly from a single LTM4638. You MUST use multiple discrete Buck Converters or use the Buck Converter's single output as the source for multiple distinct LDO regulators in a distribution tree.
-11. Provide EXACTLY THREE different combined power schemes.
-12. IMPORTANT DIAGRAM RULE: When generating the schematics_mermaid code, you MUST use the exact IC Part Number / Controller Name as the label for each node (e.g., use A[LTM4638] or A[TPS73701DCQ LDO] instead of generic names like A[Buck Converter] or A[LDO]).
-13. MANDATORY: The 'rail_analysis' array MUST contain a detailed engineering object for EVERY voltage rail specified in the input requirements (e.g., if there are 8 rails, there must be 8 items in the array).
-14. CALCULATION RULE: For each rail, the 'calculation' string MUST show the formula (e.g., V_rip = I_out / (8*f*C)) and the specific values used for that specific rail.
-15. JSON SAFETY: Do NOT use raw backslashes (\\) or complex markdown symbols in any string. Use standard division (/) and multiplication (*). Ensure all string quotes are correctly escaped.
+DESIGN RULES:
+1. Use Buck converters and LDOs. LDO inputs must come from a Buck output rail.
+2. Apply 1.5-1.75x current derating when selecting components.
+3. Each Buck is SINGLE-OUTPUT. Use separate Bucks or Buck+LDO tree for multiple rails.
+4. Minimize dropout voltage for LDO selection.
+5. Design EXACTLY THREE different power schemes.
+6. In schematics_mermaid, use exact IC part numbers as node labels (e.g., A[LTM4638]).
+7. JSON ONLY. No markdown. No comments. No trailing commas. Strict double quotes.
 
-Return ONLY a valid JSON response matching this schema exactly:
+Return ONLY valid JSON matching this exact schema:
 {{
-    "final_summary": "Extensive comparison of the 3 schemes including price, number of bucks/LDOs, and thermal performance.",
+    "final_summary": "Comparison of 3 schemes: price, efficiency, topology trade-offs.",
+    "requirements_parsed": {{
+        "ta_c": {req_params['ta']},
+        "ripple_limit_mv": {req_params['ripple_mv']},
+        "psrr_limit_db": {req_params['psrr_db']}
+    }},
     "schemes": [
         {{
-            "scheme_name": "Scheme Option Name",
+            "scheme_name": "Scheme 1 Name",
             "total_price": 0.0,
+            "switching_frequency": "1MHz",
             "selected_components": [
-                {{ "part_name": "...", "reasoning": "...", "price": 0.0 }}
+                {{"part_name": "LTM4638", "reasoning": "why selected", "price": 0.0}}
             ],
-            "rail_analysis": [
-                {{ 
-                   "rail": "V1 (3.3V)", 
-                   "component": "LTM4638",
-                   "ripple": {{ "calculation": "V_rip = 6A / (8 * 1.5MHz * 22uF)", "value": "12mV", "status": "Pass" }},
-                   "psrr": {{ "calculation": "Datasheet: 45dB min at 1.5MHz", "value": "45dB", "status": "Pass" }},
-                   "thermal": {{ "calculation": "Tj = 85C + (1.2W * 25C/W)", "value": "115C", "status": "Pass" }}
+            "rail_assignments": [
+                {{
+                    "rail": "V1 (3.3V @ 6A)",
+                    "v_out": 3.3,
+                    "i_out": 6.0,
+                    "v_in": 12.0,
+                    "component": "LTM4638",
+                    "comp_type": "buck",
+                    "upstream_component": ""
+                }},
+                {{
+                    "rail": "V2 (1.8V @ 0.5A)",
+                    "v_out": 1.8,
+                    "i_out": 0.5,
+                    "v_in": 3.3,
+                    "component": "TPS7A85A",
+                    "comp_type": "ldo",
+                    "upstream_component": "LTM4638"
                 }}
             ],
-            "switching_frequency": "1.5MHz",
-            "schematics_mermaid": "graph TD A[...]"
+            "schematics_mermaid": "graph TD\\n A[12V Input] --> B[LTM4638 Buck]\\n B --> C[3.3V Rail]"
         }}
     ]
 }}
 """
 
-
+    result_text = ""
     try:
-        client = AsyncOpenAI(
-            base_url="https://openrouter.ai/api/v1",
-            api_key=api_key,
-        )
-        
+        client = AsyncOpenAI(base_url="https://openrouter.ai/api/v1", api_key=api_key)
         response = await client.chat.completions.create(
-            # Auto-route to any available free model to prevent 404s
-            model="openrouter/free", 
+            model="openrouter/auto",
             messages=[
-                {"role": "system", "content": "You are a helpful JSON-only outputting assistant. You must output valid JSON only."},
+                {"role": "system", "content": "You output strictly valid JSON only. No markdown, no comments, no trailing commas."},
                 {"role": "user", "content": prompt}
             ],
             extra_headers={
-                "HTTP-Referer": "http://localhost:8000",
+                "HTTP-Referer": "http://localhost:8001",
                 "X-Title": "Power Scheme Generator"
             }
         )
-        
-        result_text = response.choices[0].message.content
-        # Robustly extract JSON content from potentially messy LLM response
-        try:
-            start_idx = result_text.find("{")
-            end_idx = result_text.rfind("}")
-            if start_idx != -1 and end_idx != -1:
-                result_text = result_text[start_idx:end_idx+1]
-            
-            result_json = json.loads(result_text)
-            return JSONResponse(content=result_json)
-        except Exception as parse_err:
-            print(f"DEBUG: Raw result text was: {result_text}")
-            raise HTTPException(status_code=500, detail=f"JSON Parse Error: {str(parse_err)}")
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"LLM Error: {str(e)}\n\nPrompt Response: {result_text if 'result_text' in locals() else ''}")
 
-# Serve frontend with no-cache headers to always deliver latest files
+        result_text = response.choices[0].message.content
+
+        # Robustly extract JSON block
+        start_idx = result_text.find("{")
+        end_idx   = result_text.rfind("}")
+        if start_idx == -1 or end_idx == -1:
+            raise ValueError("No JSON object found in LLM response.")
+        result_text = result_text[start_idx:end_idx+1]
+
+        llm_data = json.loads(result_text)
+
+        # ── Phase 1: Replace LLM estimates with real Python calculations ──────
+        for scheme in llm_data.get("schemes", []):
+            rail_assignments = scheme.get("rail_assignments", [])
+            if rail_assignments:
+                scheme["rail_analysis"] = calculate_all_rails(rail_assignments, req_params)
+            else:
+                scheme["rail_analysis"] = []
+
+            # Clean switching_frequency field
+            sf = scheme.get("switching_frequency", "1MHz")
+            scheme["switching_frequency"] = sf
+
+        return JSONResponse(content=llm_data)
+
+    except json.JSONDecodeError as e:
+        print(f"DEBUG raw response:\n{result_text}")
+        raise HTTPException(status_code=500, detail=f"JSON Parse Error: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"LLM Error: {str(e)}")
+
+
+# ── Static file serving (no-cache) ────────────────────────────────────────────
 @app.get("/")
 def read_index():
     return FileResponse("frontend/index.html", headers={
-        "Cache-Control": "no-store, no-cache, must-revalidate",
-        "Pragma": "no-cache"
+        "Cache-Control": "no-store, no-cache, must-revalidate", "Pragma": "no-cache"
     })
 
 @app.get("/static/{file_path:path}")
 def serve_static(file_path: str):
-    full_path = f"frontend/{file_path}"
-    return FileResponse(full_path, headers={
-        "Cache-Control": "no-store, no-cache, must-revalidate",
-        "Pragma": "no-cache"
+    return FileResponse(f"frontend/{file_path}", headers={
+        "Cache-Control": "no-store, no-cache, must-revalidate", "Pragma": "no-cache"
     })
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=8001, reload=True)
