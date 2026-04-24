@@ -1,8 +1,8 @@
 import json
 import re
 import sqlite3
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
-from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request
+from fastapi.responses import JSONResponse, FileResponse, StreamingResponse, HTMLResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 from openai import AsyncOpenAI
@@ -129,6 +129,24 @@ async def generate_scheme(file: UploadFile = File(...), api_key: str = Form(...)
 
     return StreamingResponse(stream(), media_type="text/event-stream")
 
+
+# ── Export endpoint: reliable server-side download ───────────────────────────
+@app.post("/api/export")
+async def export_report(request: Request):
+    """
+    Receives raw HTML from the frontend and returns it as a proper
+    file download with Content-Disposition headers — works in all browsers.
+    """
+    body = await request.body()
+    html_content = body.decode('utf-8')
+    return Response(
+        content=html_content,
+        media_type="text/html; charset=utf-8",
+        headers={
+            "Content-Disposition": 'attachment; filename="Power-Engineering-Report.html"',
+            "Content-Type": "text/html; charset=utf-8",
+        }
+    )
 
 # ── Static file serving ───────────────────────────────────────────────────────
 @app.get("/")
