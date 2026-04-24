@@ -7,10 +7,12 @@ from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 from openai import AsyncOpenAI
 from backend.calculator import calculate_all_rails
+from backend.drc import run_drc, check_calc_failures, drc_summary
 from backend.agents import (
     agent_component_selector,
     agent_topology_designer,
     agent_schematic_generator,
+    agent_correction,
 )
 
 app = FastAPI()
@@ -88,24 +90,20 @@ async def generate_scheme(file: UploadFile = File(...), api_key: str = Form(...)
                 "message": "Agent 3 done. Schematics generated."})
 
             # ── PYTHON CALCULATOR: Real engineering values ─────────────────
-            yield sse_event("progress", {"step": 4, "total": 4,
-                "message": "Running Python engineering calculator (ripple / PSRR / thermal)..."})
+            yield sse_event("progress", {"step": 4, "total": 6,
+                "message": "🧮 Running Python engineering calculator (ripple / PSRR / thermal)..."})
 
             agent1_schemes = agent1.get("schemes", [])
 
             for i, scheme in enumerate(schemes):
-                # Inject Mermaid diagram
                 scheme["schematics_mermaid"] = mermaid_codes[i] if i < len(mermaid_codes) else ""
 
-                # Inject selected_components and total_price from Agent 1
                 if i < len(agent1_schemes):
                     a1 = agent1_schemes[i]
                     scheme["selected_components"] = [
-                        {
-                            "part_name": sel["component"],
-                            "reasoning":  sel.get("reasoning", ""),
-                            "price":      sel.get("price", 0.0),
-                        }
+                        {"part_name": sel["component"],
+                         "reasoning":  sel.get("reasoning", ""),
+                         "price":      sel.get("price", 0.0)}
                         for sel in a1.get("component_selections", [])
                     ]
                     scheme["total_price"] = a1.get("total_price", 0.0)
@@ -113,9 +111,57 @@ async def generate_scheme(file: UploadFile = File(...), api_key: str = Form(...)
                     scheme["selected_components"] = []
                     scheme["total_price"] = 0.0
 
-                # Real Python calculations
                 rail_assignments = scheme.get("rail_assignments", [])
                 scheme["rail_analysis"] = calculate_all_rails(rail_assignments, req_params)
+
+            # ── PHASE 3: Design Rule Check ─────────────────────────────────
+            yield sse_event("progress", {"step": 5, "total": 6,
+                "message": "🔬 Running Design Rule Check (DRC)..."})
+
+            for scheme in schemes:
+                rail_assignments = scheme.get("rail_assignments", [])
+                drc_violations   = run_drc(rail_assignments, req_params)
+                calc_failures    = check_calc_failures(scheme.get("rail_analysis", []))
+                scheme["drc_violations"] = drc_violations
+                scheme["drc_summary"]    = drc_summary(drc_violations)
+
+                # ── PHASE 3: Correction Agent (only if failures found) ─────
+                all_issues = drc_violations + calc_failures
+                if all_issues:
+                    yield sse_event("progress", {"step": 5, "total": 6,
+                        "message": f"⚠️ {len(all_issues)} issue(s) in '{scheme['scheme_name']}'. Running correction agent..."})
+
+                    try:
+                        correction = await agent_correction(
+                            requirements, components,
+                            calc_failures, drc_violations,
+                            rail_assignments, api_key
+                        )
+                        corrected = correction.get("corrected_rails", [])
+                        if corrected:
+                            # Merge corrections back (replace by rail name)
+                            rail_map = {r["rail"]: r for r in rail_assignments}
+                            changes  = []
+                            for cr in corrected:
+                                if cr["rail"] in rail_map:
+                                    changes.append(f"{cr['rail']}: {cr.get('change_reason','replaced')}")
+                                    rail_map[cr["rail"]] = cr
+                            scheme["rail_assignments"] = list(rail_map.values())
+                            scheme["correction_log"]   = changes
+
+                            # Re-run calculator with corrected components
+                            scheme["rail_analysis"] = calculate_all_rails(
+                                scheme["rail_assignments"], req_params
+                            )
+                            # Re-run DRC to confirm fixes
+                            new_violations = run_drc(scheme["rail_assignments"], req_params)
+                            scheme["drc_violations"] = new_violations
+                            scheme["drc_summary"]    = drc_summary(new_violations)
+                    except Exception as corr_err:
+                        scheme["correction_log"] = [f"Correction agent error: {str(corr_err)}"]
+
+            yield sse_event("progress", {"step": 6, "total": 6,
+                "message": "✅ All checks complete. Building final report..."})
 
             # ── Final result ───────────────────────────────────────────────
             result = {

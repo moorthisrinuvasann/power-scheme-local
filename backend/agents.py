@@ -1,6 +1,9 @@
 """
-Phase 2 Agent Orchestration
-Three specialized LLM agents, each with a narrow focused task.
+Phase 2 + Phase 3 Agent Orchestration
+Agent 1: Component Selector
+Agent 2: Topology Designer
+Agent 3: Schematic Generator
+Agent 1b: Correction Agent (Phase 3 - feedback loop)
 """
 import json
 from openai import AsyncOpenAI
@@ -42,19 +45,36 @@ def _extract_json(text: str) -> dict:
     return json.loads(text[s:e+1])
 
 
+# ── Smart DB Filter (Phase 3) ─────────────────────────────────────────────────
+def filter_components(components: list, category: str = None, min_current: float = 0) -> list:
+    """
+    Filter component list before sending to LLM to reduce token usage.
+    category: 'Buck Converter' or 'LDO'
+    min_current: minimum current from summary (heuristic match)
+    """
+    filtered = []
+    for c in components:
+        cat = (c.get("category") or "").lower()
+        if category and category.lower() not in cat:
+            continue
+        filtered.append({
+            "part_name": c["part_name"],
+            "category":  c["category"],
+            "price":     c["price"],
+            "summary":   c["summary"]
+        })
+    return filtered if filtered else [{"part_name": c["part_name"], "category": c["category"],
+                                       "price": c["price"], "summary": c["summary"]} for c in components]
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # AGENT 1 — Component Selector
-# Task: For each of 3 scheme options, pick the best Buck/LDO per rail.
 # ─────────────────────────────────────────────────────────────────────────────
 async def agent_component_selector(requirements: str, components: list, api_key: str) -> dict:
-    """
-    Returns 3 schemes, each with component_selections per rail.
-    """
-    comp_summary = json.dumps([
-        {"part_name": c["part_name"], "category": c["category"],
-         "price": c["price"], "summary": c["summary"]}
-        for c in components
-    ], indent=2)
+    """Returns 3 schemes, each with component_selections per rail."""
+    bucks = filter_components(components, category="Buck")
+    ldos  = filter_components(components, category="LDO")
+    comp_summary = json.dumps(bucks + ldos, indent=2)
 
     prompt = f"""
 You are a power electronics component selection expert.
@@ -62,7 +82,7 @@ You are a power electronics component selection expert.
 USER REQUIREMENTS:
 {requirements}
 
-AVAILABLE COMPONENTS:
+AVAILABLE COMPONENTS (Bucks first, then LDOs):
 {comp_summary}
 
 SELECTION RULES:
@@ -102,13 +122,9 @@ Return ONLY valid JSON:
 
 # ─────────────────────────────────────────────────────────────────────────────
 # AGENT 2 — Topology Designer
-# Task: Given the selected components, design the power distribution tree.
-#        Assign v_in for each rail and identify upstream components for LDOs.
 # ─────────────────────────────────────────────────────────────────────────────
 async def agent_topology_designer(requirements: str, agent1_result: dict, api_key: str) -> dict:
-    """
-    Returns rail_assignments with v_in, upstream_component, and switching_frequency.
-    """
+    """Returns rail_assignments with v_in, upstream_component, switching_frequency."""
     schemes_summary = json.dumps(agent1_result["schemes"], indent=2)
 
     prompt = f"""
@@ -166,13 +182,9 @@ Return ONLY valid JSON:
 
 # ─────────────────────────────────────────────────────────────────────────────
 # AGENT 3 — Schematic Generator
-# Task: ONLY generate Mermaid diagram code — nothing else.
 # ─────────────────────────────────────────────────────────────────────────────
 async def agent_schematic_generator(schemes: list, api_key: str) -> list:
-    """
-    Returns list of mermaid code strings, one per scheme.
-    Generates all 3 schematics in a single focused LLM call.
-    """
+    """Returns list of mermaid code strings, one per scheme."""
     schemes_summary = json.dumps([
         {"scheme_name": s["scheme_name"], "rail_assignments": s.get("rail_assignments", [])}
         for s in schemes
@@ -206,7 +218,73 @@ Return ONLY valid JSON (no markdown):
     raw = await _llm(client, prompt)
     data = _extract_json(raw)
     schematics = data.get("schematics", [])
-    # Pad with empty strings if LLM returned fewer than 3
     while len(schematics) < len(schemes):
         schematics.append("graph TD\n A[Input] --> B[Output]")
     return schematics
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# AGENT 1b — Correction Agent  (Phase 3 — Feedback Loop)
+# Task: Given specific failed rails, select better replacement components.
+# ─────────────────────────────────────────────────────────────────────────────
+async def agent_correction(requirements: str, components: list,
+                            failures: list, drc_violations: list,
+                            original_assignments: list, api_key: str) -> dict:
+    """
+    Selects replacement components for failed/violated rails only.
+    Returns updated_rail_assignments (only the corrected ones).
+    """
+    issues = failures + drc_violations
+    issues_json   = json.dumps(issues, indent=2)
+    original_json = json.dumps(original_assignments, indent=2)
+    comp_summary  = json.dumps([
+        {"part_name": c["part_name"], "category": c["category"],
+         "price": c["price"], "summary": c["summary"]}
+        for c in components
+    ], indent=2)
+
+    prompt = f"""
+You are a power electronics remediation expert.
+
+ORIGINAL REQUIREMENTS:
+{requirements}
+
+CURRENT DESIGN (rail assignments):
+{original_json}
+
+FAILURES & DRC VIOLATIONS DETECTED:
+{issues_json}
+
+AVAILABLE REPLACEMENT COMPONENTS:
+{comp_summary}
+
+TASK:
+For ONLY the rails listed in the failures/violations above, select better replacement components:
+- Thermal Fail → Select Buck/LDO with lower Rtheta_ja or higher efficiency
+- Ripple Fail  → Select component with higher switching frequency or larger output capacitance
+- PSRR Fail    → Select LDO with higher PSRR rating
+- Current Derating Error → Select component with higher I_max
+- LDO Dropout Error → Select LDO with lower Vdo
+- Keep ALL other rails unchanged from original design
+
+Return ONLY valid JSON:
+{{
+  "corrected_rails": [
+    {{
+      "rail": "V1 (3.3V @ 6A)",
+      "v_out": 3.3,
+      "i_out": 6.0,
+      "v_in": 12.0,
+      "component": "LTM4655",
+      "comp_type": "buck",
+      "upstream_component": "",
+      "change_reason": "Replaced LTM4638 with LTM4655 — lower Rthja=6.5C/W improves thermal margin"
+    }}
+  ]
+}}
+"""
+    client = _make_client(api_key)
+    raw = await _llm(client, prompt)
+    return _extract_json(raw)
+
+

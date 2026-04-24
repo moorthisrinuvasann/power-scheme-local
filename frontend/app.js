@@ -130,7 +130,7 @@ function updateProgress(step, total, message) {
 
     // Add step chip
     var stepsEl = document.getElementById('agentSteps');
-    var icons = ['', '🔍', '🏗️', '📐', '🧮'];
+    var icons = ['', '🔍', '🏗️', '📐', '🧮', '🔬', '✅'];
     var chip = document.createElement('div');
     chip.style.cssText = 'background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.3);border-radius:8px;padding:0.4rem 0.8rem;font-size:0.82rem;color:#c4b5fd;display:flex;align-items:center;gap:0.5rem;';
     chip.innerHTML = '<span>' + (icons[step] || '✓') + '</span><span>' + message + '</span>';
@@ -197,6 +197,53 @@ function buildComponents(comps) {
     }).join('');
 }
 
+// ── DRC Panel builder ─────────────────────────────────────────────────────────
+function buildDrcPanel(scheme) {
+    var violations = scheme.drc_violations || [];
+    var corrections = scheme.correction_log || [];
+    var summary = scheme.drc_summary || '';
+    if (!violations.length && !corrections.length) {
+        return '<div style="margin-bottom:1rem;padding:0.6rem 1rem;background:rgba(16,185,129,0.1);border:1px solid #10b981;border-radius:8px;font-size:0.85rem;color:#10b981;">✅ DRC: All design rules passed</div>';
+    }
+    var html = '<div style="margin-bottom:1.5rem;">';
+
+    // DRC violations table
+    if (violations.length) {
+        html += '<div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.4);border-radius:10px;padding:1rem;margin-bottom:0.75rem;">'
+            + '<div style="font-weight:700;color:#f87171;margin-bottom:0.6rem;font-size:0.9rem;">⚠️ DRC Violations (' + violations.length + ')</div>'
+            + '<table style="width:100%;border-collapse:collapse;font-size:0.82rem;"><thead><tr>'
+            + '<th style="text-align:left;padding:0.4rem 0.6rem;color:#94a3b8;border-bottom:1px solid rgba(255,255,255,0.1);">Severity</th>'
+            + '<th style="text-align:left;padding:0.4rem 0.6rem;color:#94a3b8;border-bottom:1px solid rgba(255,255,255,0.1);">Rail</th>'
+            + '<th style="text-align:left;padding:0.4rem 0.6rem;color:#94a3b8;border-bottom:1px solid rgba(255,255,255,0.1);">Rule</th>'
+            + '<th style="text-align:left;padding:0.4rem 0.6rem;color:#94a3b8;border-bottom:1px solid rgba(255,255,255,0.1);">Detail</th>'
+            + '<th style="text-align:left;padding:0.4rem 0.6rem;color:#94a3b8;border-bottom:1px solid rgba(255,255,255,0.1);">Fix</th>'
+            + '</tr></thead><tbody>';
+        violations.forEach(function(v) {
+            var sevColor = v.severity === 'ERROR' ? '#f87171' : '#fbbf24';
+            html += '<tr>'
+                + '<td style="padding:0.4rem 0.6rem;"><span style="background:' + sevColor + ';color:#000;font-size:0.75rem;font-weight:700;padding:1px 6px;border-radius:4px;">' + v.severity + '</span></td>'
+                + '<td style="padding:0.4rem 0.6rem;color:#e2e8f0;font-weight:600;">' + v.rail + '</td>'
+                + '<td style="padding:0.4rem 0.6rem;color:#cbd5e1;">' + v.rule + '</td>'
+                + '<td style="padding:0.4rem 0.6rem;color:#94a3b8;font-size:0.8rem;">' + v.detail + '</td>'
+                + '<td style="padding:0.4rem 0.6rem;color:#60a5fa;font-size:0.8rem;">' + v.fix + '</td>'
+                + '</tr>';
+        });
+        html += '</tbody></table></div>';
+    }
+
+    // Correction log
+    if (corrections.length) {
+        html += '<div style="background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.3);border-radius:10px;padding:1rem;">'
+            + '<div style="font-weight:700;color:#818cf8;margin-bottom:0.5rem;font-size:0.9rem;">🔧 Auto-Corrections Applied (' + corrections.length + ')</div>';
+        corrections.forEach(function(c) {
+            html += '<div style="font-size:0.82rem;color:#94a3b8;padding:0.2rem 0;">✓ ' + c + '</div>';
+        });
+        html += '</div>';
+    }
+    html += '</div>';
+    return html;
+}
+
 // ── Render results in the browser ─────────────────────────────────────────────
 async function renderResults(data) {
     rawMermaidCodes = [];
@@ -226,7 +273,8 @@ async function renderResults(data) {
         var block = '<div class="scheme-block" style="margin-bottom:3rem;border:2px solid var(--primary);padding:2rem;border-radius:16px;background:rgba(30,41,59,0.4);">'
             + '<h2 style="color:var(--primary);font-size:1.5rem;margin-bottom:0.5rem;">' + (s.scheme_name || 'Scheme ' + (i+1))
             + ' <span style="font-size:1rem;color:#10b981;">(Total: INR ' + (s.total_price || 0) + ')</span></h2>'
-            + '<div style="color:#94a3b8;font-size:0.9rem;margin-bottom:1.5rem;"><strong style="color:#e2e8f0;">Switching Frequency:</strong> ' + (s.switching_frequency || 'N/A') + '</div>'
+            + '<div style="color:#94a3b8;font-size:0.9rem;margin-bottom:0.5rem;"><strong style="color:#e2e8f0;">Switching Frequency:</strong> ' + (s.switching_frequency || 'N/A') + '</div>'
+            + buildDrcPanel(s)
             + '<div class="result-card diagram-card" style="margin-bottom:1.5rem;background:white;"><h2 style="color:#1e293b;">Schematics</h2><div class="mermaid-view">' + svgOut + '</div></div>'
             + '<div class="results-grid">'
             + '<div class="result-card"><h2>Selected Components</h2><div>' + buildComponents(s.selected_components) + '</div></div>'
