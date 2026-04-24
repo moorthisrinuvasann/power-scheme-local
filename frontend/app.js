@@ -478,28 +478,116 @@ document.getElementById('downloadBtn').onclick = function() {
             return;
         }
 
-        var dateStr = new Date().toLocaleString();
-        var summary = lastGeneratedData.final_summary || 'No summary available.';
-        var schemesHtml = '';
+        // ── Build Comparison Table for report ──────────────────────────────
+        var comparisonHtml = '';
+        var cmp = lastGeneratedData.comparison || [];
+        if (cmp.length) {
+            var schemeColors = ['#1d4ed8','#7c3aed','#0891b2'];
+            var hdr = cmp.map(function(m,i){
+                return '<th style="padding:0.8rem 1rem;background:'+schemeColors[i%3]+';color:white;text-align:center;">Scheme '+(i+1)+'<br><span style="font-size:0.78rem;opacity:0.85;">'+((m.scheme_name||'').replace(/^Scheme \d+:\s*/i,''))+'</span></th>';
+            }).join('');
+
+            function rptCell(val, suffix, isBest) {
+                var d = (val===null||val===undefined) ? '—' : val+(suffix||'');
+                return '<td style="padding:0.6rem 1rem;text-align:center;'+(isBest?'font-weight:700;color:#16a34a;background:#f0fdf4;':'')+'">'
+                    + d + (isBest?' ★':'') + '</td>';
+            }
+            function bestI(key, low) {
+                var vals = cmp.map(function(c){return c[key];});
+                var valid = vals.filter(function(v){return v!==null&&v!==undefined;});
+                if(!valid.length) return -1;
+                var b = low ? Math.min.apply(null,valid) : Math.max.apply(null,valid);
+                return vals.indexOf(b);
+            }
+            function rptRow(label, cells) {
+                return '<tr><td style="padding:0.6rem 1rem;color:#475569;font-size:0.85rem;border-right:2px solid #e2e8f0;background:#f8fafc;">'+label+'</td>'+cells+'</tr>';
+            }
+
+            var bPrice=bestI('total_price',true), bArea=bestI('pcb_area_mm2',true),
+                bTjMax=bestI('tj_max_c',true), bEff=bestI('avg_efficiency',false);
+
+            comparisonHtml = '<div class="card" style="margin-bottom:2rem;">'
+                + '<h3 style="color:#1d4ed8;margin-bottom:1rem;">⚖️ Scheme Comparison Matrix</h3>'
+                + '<div style="overflow-x:auto;">'
+                + '<table style="width:100%;border-collapse:collapse;font-size:0.9rem;">'
+                + '<thead><tr><th style="padding:0.8rem 1rem;background:#1e3a5f;color:#94a3b8;text-align:left;">Metric</th>'+hdr+'</tr></thead>'
+                + '<tbody>'
+                + rptRow('💰 Total Price (INR)', cmp.map(function(m,i){return rptCell(m.total_price,'',bPrice===i);}).join(''))
+                + rptRow('⚡ Buck Converters',   cmp.map(function(m,i){return rptCell(m.num_bucks,'',bestI('num_bucks',true)===i);}).join(''))
+                + rptRow('🔋 LDO Regulators',    cmp.map(function(m,i){return rptCell(m.num_ldos,'',bestI('num_ldos',true)===i);}).join(''))
+                + rptRow('📊 Total Rails',        cmp.map(function(m){return rptCell(m.num_rails,'',false);}).join(''))
+                + rptRow('📐 Est. PCB Area',      cmp.map(function(m,i){return rptCell(m.pcb_area_mm2,' mm²',bArea===i);}).join(''))
+                + rptRow('🔌 Output Capacitors',  cmp.map(function(m,i){return rptCell(m.total_caps,'',bestI('total_caps',true)===i);}).join(''))
+                + rptRow('〰️ Resistors',          cmp.map(function(m){return rptCell(m.total_resistors,'',false);}).join(''))
+                + rptRow('🌀 Inductors (ext.)',   cmp.map(function(m){return rptCell(m.total_inductors,'',false);}).join(''))
+                + rptRow('🌡️ Tj Min (°C)',        cmp.map(function(m,i){return rptCell(m.tj_min_c,'°C',bestI('tj_min_c',true)===i);}).join(''))
+                + rptRow('🔥 Tj Max (°C)',        cmp.map(function(m,i){return rptCell(m.tj_max_c,'°C',bTjMax===i);}).join(''))
+                + rptRow('✨ Avg Efficiency',     cmp.map(function(m,i){return rptCell(m.avg_efficiency,'%',bEff===i);}).join(''))
+                + rptRow('📡 Switching Freq',     cmp.map(function(m){return '<td style="padding:0.6rem 1rem;text-align:center;color:#475569;">'+(m.switching_freq||'N/A')+'</td>';}).join(''))
+                + rptRow('🔬 DRC Status', cmp.map(function(m){
+                    var s = m.drc_errors>0 ? '<span style="color:#dc2626;font-weight:700;">'+m.drc_errors+' ERROR(S)</span>' :
+                            m.drc_warnings>0 ? '<span style="color:#d97706;font-weight:700;">'+m.drc_warnings+' WARNING(S)</span>' :
+                            '<span style="color:#16a34a;font-weight:700;">✅ PASS</span>';
+                    return '<td style="padding:0.6rem 1rem;text-align:center;">'+s+'</td>';
+                }).join(''))
+                + '</tbody></table>'
+                + '<p style="font-size:0.78rem;color:#94a3b8;margin-top:0.5rem;">★ = Best value in category</p>'
+                + '</div></div>';
+        }
+
+        // ── Build DRC + Correction sections per scheme ─────────────────────
+        function buildReportDrc(scheme) {
+            var violations = scheme.drc_violations || [];
+            var corrections = scheme.correction_log || [];
+            var out = '';
+
+            if (violations.length) {
+                out += '<div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:8px;padding:1rem;margin-bottom:0.75rem;">'
+                    + '<div style="font-weight:700;color:#dc2626;margin-bottom:0.5rem;">⚠️ DRC Violations ('+violations.length+')</div>'
+                    + '<table style="width:100%;border-collapse:collapse;font-size:0.82rem;"><thead><tr>'
+                    + '<th style="padding:0.4rem 0.6rem;text-align:left;color:#64748b;border-bottom:1px solid #e2e8f0;">Severity</th>'
+                    + '<th style="padding:0.4rem 0.6rem;text-align:left;color:#64748b;border-bottom:1px solid #e2e8f0;">Rail</th>'
+                    + '<th style="padding:0.4rem 0.6rem;text-align:left;color:#64748b;border-bottom:1px solid #e2e8f0;">Rule</th>'
+                    + '<th style="padding:0.4rem 0.6rem;text-align:left;color:#64748b;border-bottom:1px solid #e2e8f0;">Detail</th>'
+                    + '<th style="padding:0.4rem 0.6rem;text-align:left;color:#64748b;border-bottom:1px solid #e2e8f0;">Fix</th>'
+                    + '</tr></thead><tbody>';
+                violations.forEach(function(v) {
+                    var sc = v.severity==='ERROR' ? '#dc2626' : '#d97706';
+                    out += '<tr><td style="padding:0.4rem 0.6rem;"><span style="background:'+sc+';color:white;padding:1px 6px;border-radius:4px;font-size:0.75rem;">'+v.severity+'</span></td>'
+                        + '<td style="padding:0.4rem 0.6rem;font-weight:600;">'+v.rail+'</td>'
+                        + '<td style="padding:0.4rem 0.6rem;color:#475569;">'+v.rule+'</td>'
+                        + '<td style="padding:0.4rem 0.6rem;color:#64748b;font-size:0.8rem;">'+v.detail+'</td>'
+                        + '<td style="padding:0.4rem 0.6rem;color:#1d4ed8;font-size:0.8rem;">'+v.fix+'</td></tr>';
+                });
+                out += '</tbody></table></div>';
+            } else {
+                out += '<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:0.6rem 1rem;margin-bottom:0.75rem;color:#16a34a;font-weight:600;font-size:0.9rem;">✅ DRC: All design rules passed</div>';
+            }
+
+            if (corrections.length) {
+                out += '<div style="background:#eff6ff;border:1px solid #93c5fd;border-radius:8px;padding:1rem;">'
+                    + '<div style="font-weight:700;color:#1d4ed8;margin-bottom:0.5rem;">🔧 Auto-Corrections Applied ('+corrections.length+')</div>';
+                corrections.forEach(function(c) {
+                    out += '<div style="font-size:0.85rem;color:#475569;padding:0.2rem 0;">✓ '+c+'</div>';
+                });
+                out += '</div>';
+            }
+            return out ? '<div class="card"><h3>DRC Validation &amp; Auto-Corrections</h3>'+out+'</div>' : '';
+        }
 
         lastGeneratedData.schemes.forEach(function(s, i) {
-            var railTableHtml = buildReportRailTable(s.rail_analysis);
+            var railTableHtml  = buildReportRailTable(s.rail_analysis);
             var componentsHtml = buildReportComponents(s.selected_components);
-            var mCode = rawMermaidCodes[i] || '';
+            var mCode          = rawMermaidCodes[i] || '';
+            var drcHtml        = buildReportDrc(s);
 
             schemesHtml += '<div class="scheme-block">'
-                + '<h2>' + (s.scheme_name || 'Scheme ' + (i+1)) + ' <span class="price-badge">Total: INR ' + (s.total_price || 0) + '</span></h2>'
-                + '<p class="freq-info"><strong>Switching Frequency:</strong> ' + (s.switching_frequency || 'N/A') + '</p>'
-
-                // Schematics
+                + '<h2>' + (s.scheme_name || 'Scheme '+(i+1)) + ' <span class="price-badge">Total: INR ' + (s.total_price||0) + '</span></h2>'
+                + '<p class="freq-info"><strong>Switching Frequency:</strong> ' + (s.switching_frequency||'N/A') + '</p>'
+                + drcHtml
                 + '<div class="card"><h3>Schematics</h3><div class="mermaid">' + mCode + '</div></div>'
-
-                // Components
                 + '<div class="card"><h3>Selected Components</h3>' + componentsHtml + '</div>'
-
-                // Per-Rail Engineering Analysis
                 + '<div class="card"><h3>Engineering Analysis — Per Rail</h3>' + railTableHtml + '</div>'
-
                 + '</div>';
         });
 
@@ -524,11 +612,13 @@ document.getElementById('downloadBtn').onclick = function() {
             + '  .summary-card h2 { color: #4338ca; margin: 0 0 0.75rem; }\n'
             + '  .summary-card p { color: #374151; line-height: 1.7; white-space: pre-wrap; }\n'
             + '  footer { text-align: center; color: #94a3b8; margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid #e2e8f0; font-size: 0.9rem; }\n'
+            + '  @media print { body { padding: 1rem; } .scheme-block { page-break-inside: avoid; } }\n'
             + '</style>\n'
             + '</head>\n<body>\n'
             + '<h1>&#9889; Power Scheme Engineering Report</h1>\n'
             + '<p style="color:#64748b;margin-bottom:1.5rem;"><strong>Generated On:</strong> ' + dateStr + '</p>\n'
             + '<div class="summary-card"><h2>Executive Summary</h2><p>' + summary + '</p></div>\n'
+            + comparisonHtml
             + schemesHtml
             + '<footer>Generated by AI Power Scheme Engineering System &mdash; Powered by OpenRouter LLM</footer>\n'
             + '</body>\n</html>';
