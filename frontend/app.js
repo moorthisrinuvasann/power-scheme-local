@@ -27,21 +27,23 @@ document.addEventListener('change', function(e) {
 
 // Generate button click
 document.getElementById('generateBtn').onclick = function() {
-    var apiKey = document.getElementById('apiKey').value.trim();
+    var apiKey  = document.getElementById('apiKey').value.trim();
     var reqText = document.getElementById('reqText').value.trim();
 
-    if (!apiKey) { alert('Please enter your OpenRouter API key.'); return; }
+    if (!apiKey)  { alert('Please enter your OpenRouter API key.'); return; }
     if (!reqText) { alert('Please enter requirements in the text area or upload a file.'); return; }
 
     document.getElementById('loader').classList.remove('hidden');
     document.getElementById('results').classList.add('hidden');
     document.getElementById('generateBtn').disabled = true;
+    updateProgress(0, 4, 'Starting AI agent pipeline...');
 
     var blob = new Blob([reqText], { type: 'text/plain' });
     var formData = new FormData();
     formData.append('file', blob, 'requirements.txt');
     formData.append('api_key', apiKey);
 
+    // Use fetch to POST, then read SSE stream from response body
     fetch('/api/generate', { method: 'POST', body: formData })
     .then(function(response) {
         if (!response.ok) {
@@ -49,22 +51,87 @@ document.getElementById('generateBtn').onclick = function() {
                 throw new Error(err.detail || 'Server error ' + response.status);
             });
         }
-        return response.json();
-    })
-    .then(function(data) {
-        console.log('LLM Data:', JSON.stringify(data, null, 2));
-        lastGeneratedData = data;
-        renderResults(data);
+        var reader = response.body.getReader();
+        var decoder = new TextDecoder();
+        var buffer = '';
+
+        function read() {
+            return reader.read().then(function(chunk) {
+                if (chunk.done) return;
+                buffer += decoder.decode(chunk.value, { stream: true });
+
+                // Parse SSE lines from buffer
+                var lines = buffer.split('\n');
+                buffer = lines.pop(); // keep incomplete last line
+
+                var eventType = '';
+                for (var i = 0; i < lines.length; i++) {
+                    var line = lines[i].trim();
+                    if (line.startsWith('event:')) {
+                        eventType = line.replace('event:', '').trim();
+                    } else if (line.startsWith('data:')) {
+                        var jsonStr = line.replace('data:', '').trim();
+                        if (!jsonStr) continue;
+                        try {
+                            var payload = JSON.parse(jsonStr);
+                            if (eventType === 'progress') {
+                                updateProgress(payload.step, payload.total, payload.message);
+                            } else if (eventType === 'result') {
+                                console.log('LLM Data:', JSON.stringify(payload, null, 2));
+                                lastGeneratedData = payload;
+                                renderResults(payload);
+                                document.getElementById('loader').classList.add('hidden');
+                                document.getElementById('generateBtn').disabled = false;
+                            } else if (eventType === 'error') {
+                                alert('Error: ' + payload.message);
+                                document.getElementById('loader').classList.add('hidden');
+                                document.getElementById('generateBtn').disabled = false;
+                            }
+                        } catch(e) { console.warn('SSE parse error:', e, jsonStr); }
+                        eventType = '';
+                    }
+                }
+                return read();
+            });
+        }
+        return read();
     })
     .catch(function(err) {
         alert('Error: ' + err.message);
         console.error(err);
-    })
-    .finally(function() {
         document.getElementById('loader').classList.add('hidden');
         document.getElementById('generateBtn').disabled = false;
     });
 };
+
+// ── Live progress bar ─────────────────────────────────────────────────────────
+function updateProgress(step, total, message) {
+    var loaderEl = document.getElementById('loader');
+    // Inject progress UI if not already present
+    if (!document.getElementById('agentProgress')) {
+        loaderEl.insertAdjacentHTML('beforeend',
+            '<div id="agentProgress" style="margin-top:1.5rem;width:100%;max-width:480px;">'
+            + '<div id="progressMsg" style="color:#94a3b8;font-size:0.9rem;margin-bottom:0.75rem;text-align:center;min-height:1.4rem;"></div>'
+            + '<div style="background:rgba(255,255,255,0.1);border-radius:999px;height:8px;overflow:hidden;">'
+            + '<div id="progressBar" style="height:100%;background:linear-gradient(90deg,#6366f1,#8b5cf6);border-radius:999px;transition:width 0.5s ease;width:0%;"></div>'
+            + '</div>'
+            + '<div id="agentSteps" style="margin-top:1rem;display:flex;flex-direction:column;gap:0.5rem;"></div>'
+            + '</div>'
+        );
+    }
+    var pct = total > 0 ? Math.round((step / total) * 100) : 0;
+    document.getElementById('progressBar').style.width = pct + '%';
+    document.getElementById('progressMsg').textContent = message;
+
+    // Add step chip
+    var stepsEl = document.getElementById('agentSteps');
+    var icons = ['', '🔍', '🏗️', '📐', '🧮'];
+    var chip = document.createElement('div');
+    chip.style.cssText = 'background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.3);border-radius:8px;padding:0.4rem 0.8rem;font-size:0.82rem;color:#c4b5fd;display:flex;align-items:center;gap:0.5rem;';
+    chip.innerHTML = '<span>' + (icons[step] || '✓') + '</span><span>' + message + '</span>';
+    stepsEl.appendChild(chip);
+}
+
 
 // ── Build rail analysis table (browser view, dark theme) ─────────────────────
 function buildRailAnalysisTable(rails) {

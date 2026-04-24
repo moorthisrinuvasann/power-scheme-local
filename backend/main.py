@@ -2,11 +2,16 @@ import json
 import re
 import sqlite3
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 from openai import AsyncOpenAI
 from backend.calculator import calculate_all_rails
+from backend.agents import (
+    agent_component_selector,
+    agent_topology_designer,
+    agent_schematic_generator,
+)
 
 app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -23,9 +28,8 @@ def get_all_components():
     return [{"part_name": r[0], "category": r[1], "price": r[2],
              "bug_details": r[3], "summary": (r[4] or "")[:800]} for r in rows]
 
-# ── Parse requirements from text ──────────────────────────────────────────────
+# ── Parse requirements ────────────────────────────────────────────────────────
 def parse_requirements(text: str) -> dict:
-    """Extract numeric values from free-text requirements."""
     req = {"ta": 85, "ripple_mv": 15, "psrr_db": 35}
     m = re.search(r'[Aa]mbient\s*[Tt]emp[^:]*:\s*([\d.]+)', text)
     if m: req["ta"] = float(m.group(1))
@@ -35,129 +39,98 @@ def parse_requirements(text: str) -> dict:
     if m: req["psrr_db"] = float(m.group(1))
     return req
 
-# ── Main API endpoint ─────────────────────────────────────────────────────────
+# ── SSE helper ────────────────────────────────────────────────────────────────
+def sse_event(event: str, data: dict) -> str:
+    return f"event: {event}\ndata: {json.dumps(data)}\n\n"
+
+# ── Main streaming endpoint ───────────────────────────────────────────────────
 @app.post("/api/generate")
 async def generate_scheme(file: UploadFile = File(...), api_key: str = Form(...)):
     if not api_key:
         raise HTTPException(status_code=400, detail="OpenRouter API key is required.")
-
     try:
         content = await file.read()
         requirements = content.decode('utf-8')
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Error reading file: {e}")
 
-    req_params = parse_requirements(requirements)
-    components = get_all_components()
-    components_json = json.dumps(components, indent=2)
+    req_params  = parse_requirements(requirements)
+    components  = get_all_components()
 
-    # ── Simplified LLM prompt: topology + components + mermaid ONLY ───────────
-    prompt = f"""
-You are an expert power electronics engineer. The user has provided the following electrical requirements:
-{requirements}
+    async def stream():
+        try:
+            # ── AGENT 1: Component Selection ──────────────────────────────
+            yield sse_event("progress", {"step": 1, "total": 3,
+                "message": "Agent 1/3: Selecting optimal components for each rail..."})
 
-Available components in the database:
-{components_json}
+            agent1 = await agent_component_selector(requirements, components, api_key)
 
-DESIGN RULES:
-1. Use Buck converters and LDOs. LDO inputs must come from a Buck output rail.
-2. Apply 1.5-1.75x current derating when selecting components.
-3. Each Buck is SINGLE-OUTPUT. Use separate Bucks or Buck+LDO tree for multiple rails.
-4. Minimize dropout voltage for LDO selection.
-5. Design EXACTLY THREE different power schemes.
-6. In schematics_mermaid, use exact IC part numbers as node labels (e.g., A[LTM4638]).
-7. JSON ONLY. No markdown. No comments. No trailing commas. Strict double quotes.
+            yield sse_event("progress", {"step": 1, "total": 3,
+                "message": f"Agent 1 done. Selected components for {len(agent1.get('schemes', []))} schemes."})
 
-Return ONLY valid JSON matching this exact schema:
-{{
-    "final_summary": "Comparison of 3 schemes: price, efficiency, topology trade-offs.",
-    "requirements_parsed": {{
-        "ta_c": {req_params['ta']},
-        "ripple_limit_mv": {req_params['ripple_mv']},
-        "psrr_limit_db": {req_params['psrr_db']}
-    }},
-    "schemes": [
-        {{
-            "scheme_name": "Scheme 1 Name",
-            "total_price": 0.0,
-            "switching_frequency": "1MHz",
-            "selected_components": [
-                {{"part_name": "LTM4638", "reasoning": "why selected", "price": 0.0}}
-            ],
-            "rail_assignments": [
-                {{
-                    "rail": "V1 (3.3V @ 6A)",
-                    "v_out": 3.3,
-                    "i_out": 6.0,
-                    "v_in": 12.0,
-                    "component": "LTM4638",
-                    "comp_type": "buck",
-                    "upstream_component": ""
-                }},
-                {{
-                    "rail": "V2 (1.8V @ 0.5A)",
-                    "v_out": 1.8,
-                    "i_out": 0.5,
-                    "v_in": 3.3,
-                    "component": "TPS7A85A",
-                    "comp_type": "ldo",
-                    "upstream_component": "LTM4638"
-                }}
-            ],
-            "schematics_mermaid": "graph TD\\n A[12V Input] --> B[LTM4638 Buck]\\n B --> C[3.3V Rail]"
-        }}
-    ]
-}}
-"""
+            # ── AGENT 2: Topology Design ──────────────────────────────────
+            yield sse_event("progress", {"step": 2, "total": 3,
+                "message": "Agent 2/3: Designing power distribution topology..."})
 
-    result_text = ""
-    try:
-        client = AsyncOpenAI(base_url="https://openrouter.ai/api/v1", api_key=api_key)
-        response = await client.chat.completions.create(
-            model="openrouter/auto",
-            messages=[
-                {"role": "system", "content": "You output strictly valid JSON only. No markdown, no comments, no trailing commas."},
-                {"role": "user", "content": prompt}
-            ],
-            extra_headers={
-                "HTTP-Referer": "http://localhost:8001",
-                "X-Title": "Power Scheme Generator"
-            }
-        )
+            agent2 = await agent_topology_designer(requirements, agent1, api_key)
 
-        result_text = response.choices[0].message.content
+            yield sse_event("progress", {"step": 2, "total": 3,
+                "message": "Agent 2 done. Power tree topology finalized."})
 
-        # Robustly extract JSON block
-        start_idx = result_text.find("{")
-        end_idx   = result_text.rfind("}")
-        if start_idx == -1 or end_idx == -1:
-            raise ValueError("No JSON object found in LLM response.")
-        result_text = result_text[start_idx:end_idx+1]
+            # ── AGENT 3: Schematic Generation ─────────────────────────────
+            yield sse_event("progress", {"step": 3, "total": 3,
+                "message": "Agent 3/3: Generating Mermaid schematics..."})
 
-        llm_data = json.loads(result_text)
+            schemes = agent2.get("schemes", [])
+            mermaid_codes = await agent_schematic_generator(schemes, api_key)
 
-        # ── Phase 1: Replace LLM estimates with real Python calculations ──────
-        for scheme in llm_data.get("schemes", []):
-            rail_assignments = scheme.get("rail_assignments", [])
-            if rail_assignments:
+            yield sse_event("progress", {"step": 3, "total": 3,
+                "message": "Agent 3 done. Schematics generated."})
+
+            # ── PYTHON CALCULATOR: Real engineering values ─────────────────
+            yield sse_event("progress", {"step": 4, "total": 4,
+                "message": "Running Python engineering calculator (ripple / PSRR / thermal)..."})
+
+            agent1_schemes = agent1.get("schemes", [])
+
+            for i, scheme in enumerate(schemes):
+                # Inject Mermaid diagram
+                scheme["schematics_mermaid"] = mermaid_codes[i] if i < len(mermaid_codes) else ""
+
+                # Inject selected_components and total_price from Agent 1
+                if i < len(agent1_schemes):
+                    a1 = agent1_schemes[i]
+                    scheme["selected_components"] = [
+                        {
+                            "part_name": sel["component"],
+                            "reasoning":  sel.get("reasoning", ""),
+                            "price":      sel.get("price", 0.0),
+                        }
+                        for sel in a1.get("component_selections", [])
+                    ]
+                    scheme["total_price"] = a1.get("total_price", 0.0)
+                else:
+                    scheme["selected_components"] = []
+                    scheme["total_price"] = 0.0
+
+                # Real Python calculations
+                rail_assignments = scheme.get("rail_assignments", [])
                 scheme["rail_analysis"] = calculate_all_rails(rail_assignments, req_params)
-            else:
-                scheme["rail_analysis"] = []
 
-            # Clean switching_frequency field
-            sf = scheme.get("switching_frequency", "1MHz")
-            scheme["switching_frequency"] = sf
+            # ── Final result ───────────────────────────────────────────────
+            result = {
+                "final_summary": agent2.get("final_summary", ""),
+                "schemes": schemes,
+            }
+            yield sse_event("result", result)
 
-        return JSONResponse(content=llm_data)
+        except Exception as e:
+            yield sse_event("error", {"message": str(e)})
 
-    except json.JSONDecodeError as e:
-        print(f"DEBUG raw response:\n{result_text}")
-        raise HTTPException(status_code=500, detail=f"JSON Parse Error: {str(e)}")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"LLM Error: {str(e)}")
+    return StreamingResponse(stream(), media_type="text/event-stream")
 
 
-# ── Static file serving (no-cache) ────────────────────────────────────────────
+# ── Static file serving ───────────────────────────────────────────────────────
 @app.get("/")
 def read_index():
     return FileResponse("frontend/index.html", headers={
