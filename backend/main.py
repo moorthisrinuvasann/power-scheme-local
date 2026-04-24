@@ -8,6 +8,7 @@ import uvicorn
 from openai import AsyncOpenAI
 from backend.calculator import calculate_all_rails
 from backend.drc import run_drc, check_calc_failures, drc_summary
+from backend.comparator import compare_schemes
 from backend.agents import (
     agent_component_selector,
     agent_topology_designer,
@@ -166,7 +167,8 @@ async def generate_scheme(file: UploadFile = File(...), api_key: str = Form(...)
             # ── Final result ───────────────────────────────────────────────
             result = {
                 "final_summary": agent2.get("final_summary", ""),
-                "schemes": schemes,
+                "schemes":       schemes,
+                "comparison":    compare_schemes(schemes),
             }
             yield sse_event("result", result)
 

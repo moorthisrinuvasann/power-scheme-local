@@ -210,6 +210,98 @@ function buildComponents(comps) {
     }).join('');
 }
 
+// ── Scheme Comparison Table ───────────────────────────────────────────────────
+function buildComparisonTable(comparison) {
+    if (!comparison || !comparison.length) return '';
+
+    // Helper: find which scheme index has the best (lowest) value for a metric
+    function bestIdx(key, lowerIsBetter) {
+        var vals = comparison.map(function(c) { return c[key]; });
+        var valid = vals.filter(function(v) { return v !== null && v !== undefined; });
+        if (!valid.length) return -1;
+        var best = lowerIsBetter ? Math.min.apply(null, valid) : Math.max.apply(null, valid);
+        return vals.indexOf(best);
+    }
+
+    function cell(val, isBest, suffix) {
+        suffix = suffix || '';
+        var display = (val === null || val === undefined) ? '—' : val + suffix;
+        var style = isBest
+            ? 'padding:0.7rem 1rem;text-align:center;font-weight:700;color:#10b981;background:rgba(16,185,129,0.1);'
+            : 'padding:0.7rem 1rem;text-align:center;color:#cbd5e1;';
+        return '<td style="' + style + '">' + display + (isBest ? ' ★' : '') + '</td>';
+    }
+
+    function drcCell(m, idx) {
+        if (m.drc_errors > 0) {
+            var isBest = bestIdx('drc_errors', true) === idx;
+            return '<td style="padding:0.7rem 1rem;text-align:center;">'
+                + '<span style="color:#f87171;font-weight:700;">' + m.drc_errors + ' ERR</span>'
+                + (m.drc_warnings ? ' <span style="color:#fbbf24;font-size:0.8rem;">+' + m.drc_warnings + 'W</span>' : '')
+                + '</td>';
+        }
+        if (m.drc_warnings > 0) {
+            return '<td style="padding:0.7rem 1rem;text-align:center;color:#fbbf24;font-weight:700;">' + m.drc_warnings + ' WARN</td>';
+        }
+        return '<td style="padding:0.7rem 1rem;text-align:center;color:#10b981;font-weight:700;">✅ PASS</td>';
+    }
+
+    // Pre-compute best indices
+    var bestPrice    = bestIdx('total_price',    true);
+    var bestArea     = bestIdx('pcb_area_mm2',   true);
+    var bestPassives = bestIdx('total_passives',  true);
+    var bestTjMax    = bestIdx('tj_max_c',        true);
+    var bestEff      = bestIdx('avg_efficiency', false);
+
+    var schemeColors = ['#6366f1', '#8b5cf6', '#06b6d4'];
+
+    // Header row
+    var headerCols = comparison.map(function(m, i) {
+        var shortName = (m.scheme_name || 'Scheme ' + (i+1)).replace(/^Scheme \d+:\s*/i, '');
+        return '<th style="padding:1rem;background:' + schemeColors[i % 3] + ';color:white;text-align:center;font-size:0.95rem;border-radius:' + (i===0?'8px 0 0 0':i===comparison.length-1?'0 8px 0 0':'0') + ';">'
+            + '<div style="font-weight:700;">Scheme ' + (i+1) + '</div>'
+            + '<div style="font-size:0.8rem;opacity:0.85;margin-top:0.2rem;">' + shortName + '</div>'
+            + '</th>';
+    }).join('');
+
+    function row(label, icon, cells) {
+        return '<tr>'
+            + '<td style="padding:0.7rem 1rem;color:#94a3b8;font-size:0.85rem;white-space:nowrap;border-right:1px solid rgba(255,255,255,0.06);">'
+            + icon + ' ' + label + '</td>'
+            + cells
+            + '</tr>';
+    }
+
+    var priceRow    = row('Total Price (INR)',    '💰', comparison.map(function(m,i){ return cell(m.total_price,    bestPrice===i,    ''); }).join(''));
+    var bucksRow    = row('Buck Converters',       '⚡', comparison.map(function(m,i){ return cell(m.num_bucks,     bestIdx('num_bucks',true)===i, ''); }).join(''));
+    var ldosRow     = row('LDO Regulators',        '🔋', comparison.map(function(m,i){ return cell(m.num_ldos,      bestIdx('num_ldos',true)===i,  ''); }).join(''));
+    var railsRow    = row('Total Rails',           '📊', comparison.map(function(m,i){ return cell(m.num_rails,     -1,                            ''); }).join(''));
+    var areaRow     = row('Est. PCB Area',         '📐', comparison.map(function(m,i){ return cell(m.pcb_area_mm2,  bestArea===i,     ' mm²'); }).join(''));
+    var capsRow     = row('Output Capacitors',     '🔌', comparison.map(function(m,i){ return cell(m.total_caps,    bestPassives===i, ''); }).join(''));
+    var resRow      = row('Resistors',             '〰️', comparison.map(function(m,i){ return cell(m.total_resistors, -1,             ''); }).join(''));
+    var indRow      = row('Inductors (ext.)',      '🌀', comparison.map(function(m,i){ return cell(m.total_inductors, -1,             ''); }).join(''));
+    var tjMinRow    = row('Tj Min (°C)',           '🌡️', comparison.map(function(m,i){ return cell(m.tj_min_c,      bestIdx('tj_min_c',true)===i, '°C'); }).join(''));
+    var tjMaxRow    = row('Tj Max (°C)',           '🔥', comparison.map(function(m,i){ return cell(m.tj_max_c,      bestTjMax===i,    '°C'); }).join(''));
+    var effRow      = row('Avg Efficiency',        '✨', comparison.map(function(m,i){ return cell(m.avg_efficiency, bestEff===i,     '%'); }).join(''));
+    var freqRow     = row('Switching Frequency',   '📡', comparison.map(function(m,i){ return '<td style="padding:0.7rem 1rem;text-align:center;color:#94a3b8;">' + (m.switching_freq||'N/A') + '</td>'; }).join(''));
+    var drcRow      = row('DRC Status',            '🔬', comparison.map(function(m,i){ return drcCell(m, i); }).join(''));
+
+    return '<div style="margin-bottom:2.5rem;">'
+        + '<div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:1rem;">'
+        + '<span style="font-size:1.4rem;">⚖️</span>'
+        + '<h2 style="color:#e2e8f0;font-size:1.3rem;margin:0;">Scheme Comparison</h2>'
+        + '<span style="background:rgba(99,102,241,0.2);color:#818cf8;font-size:0.78rem;padding:0.2rem 0.7rem;border-radius:999px;border:1px solid rgba(99,102,241,0.3);">★ = Best in class</span>'
+        + '</div>'
+        + '<div style="overflow-x:auto;border-radius:12px;border:1px solid rgba(255,255,255,0.08);">'
+        + '<table style="width:100%;border-collapse:collapse;background:rgba(15,23,42,0.6);">'
+        + '<thead><tr><th style="padding:1rem;background:rgba(30,41,59,0.8);text-align:left;color:#64748b;font-size:0.85rem;border-radius:8px 0 0 0;">Metric</th>' + headerCols + '</tr></thead>'
+        + '<tbody>'
+        + priceRow + bucksRow + ldosRow + railsRow + areaRow
+        + capsRow  + resRow   + indRow  + tjMinRow + tjMaxRow
+        + effRow   + freqRow  + drcRow
+        + '</tbody></table></div></div>';
+}
+
 // ── DRC Panel builder ─────────────────────────────────────────────────────────
 function buildDrcPanel(scheme) {
     var violations = scheme.drc_violations || [];
@@ -265,6 +357,11 @@ async function renderResults(data) {
     container.innerHTML = '';
 
     if (!data.schemes || !Array.isArray(data.schemes)) return;
+
+    // ── Render Comparison Table first ────────────────────────────────────────
+    if (data.comparison && Array.isArray(data.comparison)) {
+        container.innerHTML = buildComparisonTable(data.comparison);
+    }
 
     for (var i = 0; i < data.schemes.length; i++) {
         var s = data.schemes[i];
