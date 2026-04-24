@@ -65,37 +65,50 @@ document.getElementById('generateBtn').onclick = function() {
                 if (chunk.done) return;
                 buffer += decoder.decode(chunk.value, { stream: true });
 
-                // Parse SSE lines from buffer
-                var lines = buffer.split('\n');
-                buffer = lines.pop(); // keep incomplete last line
+                // ── SSE event-boundary parser ─────────────────────────────
+                // Split on double-newline (end of SSE event), keep incomplete tail
+                var events = buffer.split('\n\n');
+                buffer = events.pop(); // last item may be incomplete — save for next chunk
 
-                var eventType = '';
-                for (var i = 0; i < lines.length; i++) {
-                    var line = lines[i].trim();
-                    if (line.startsWith('event:')) {
-                        eventType = line.replace('event:', '').trim();
-                    } else if (line.startsWith('data:')) {
-                        var jsonStr = line.replace('data:', '').trim();
-                        if (!jsonStr) continue;
-                        try {
-                            var payload = JSON.parse(jsonStr);
-                            if (eventType === 'progress') {
-                                updateProgress(payload.step, payload.total, payload.message);
-                            } else if (eventType === 'result') {
-                                console.log('LLM Data:', JSON.stringify(payload, null, 2));
-                                lastGeneratedData = payload;
-                                renderResults(payload);
-                                document.getElementById('loader').classList.add('hidden');
-                                document.getElementById('generateBtn').disabled = false;
-                            } else if (eventType === 'error') {
-                                alert('Error: ' + payload.message);
-                                document.getElementById('loader').classList.add('hidden');
-                                document.getElementById('generateBtn').disabled = false;
-                            }
-                        } catch(e) { console.warn('SSE parse error:', e, jsonStr); }
-                        eventType = '';
+                events.forEach(function(eventBlock) {
+                    if (!eventBlock.trim()) return;
+
+                    var eventType = '';
+                    var dataLines = [];
+
+                    // Parse all lines within this event block
+                    eventBlock.split('\n').forEach(function(line) {
+                        if (line.startsWith('event:')) {
+                            eventType = line.slice(6).trim();
+                        } else if (line.startsWith('data:')) {
+                            dataLines.push(line.slice(5).trim());
+                        }
+                    });
+
+                    if (!eventType || !dataLines.length) return;
+                    var jsonStr = dataLines.join(''); // join data lines (handles chunked data)
+                    if (!jsonStr) return;
+
+                    try {
+                        var payload = JSON.parse(jsonStr);
+                        if (eventType === 'progress') {
+                            updateProgress(payload.step, payload.total, payload.message);
+                        } else if (eventType === 'result') {
+                            console.log('LLM Data:', payload);
+                            lastGeneratedData = payload;
+                            renderResults(payload);
+                            document.getElementById('loader').classList.add('hidden');
+                            document.getElementById('generateBtn').disabled = false;
+                        } else if (eventType === 'error') {
+                            alert('Error: ' + payload.message);
+                            document.getElementById('loader').classList.add('hidden');
+                            document.getElementById('generateBtn').disabled = false;
+                        }
+                    } catch(e) {
+                        console.warn('SSE JSON parse error for event [' + eventType + ']:', e.message, '\nRaw:', jsonStr.slice(0, 200));
                     }
-                }
+                });
+
                 return read();
             });
         }
