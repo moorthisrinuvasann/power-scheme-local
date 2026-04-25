@@ -161,18 +161,22 @@ function buildRailAnalysisTable(rails) {
         + '</tr></thead><tbody>';
 
     rails.forEach(function(r) {
-        var safeRipple  = r.ripple  || { calculation: 'N/A', value: 'N/A', status: 'N/A' };
-        var safePsrr    = r.psrr    || { calculation: 'N/A', value: 'N/A', status: 'N/A' };
-        var safeThermal = r.thermal || { calculation: 'N/A', value: 'N/A', status: 'N/A' };
+        var safeRipple   = r.ripple    || { calculation: 'N/A', value: 'N/A', status: 'N/A' };
+        var safePsrr     = r.psrr      || { calculation: 'N/A', value: 'N/A', status: 'N/A' };
+        var safeThermal  = r.thermal   || { calculation: 'N/A', value: 'N/A', status: 'N/A' };
+        var safeDerating = r.derating  || { calculation: 'N/A', value: 'N/A', status: 'N/A' };
 
         function statusClass(s) {
             if (!s) return '';
-            return s.toLowerCase().includes('pass') ? 'status-pass' : 'status-fail';
+            var sl = s.toLowerCase();
+            if (sl.includes('pass')) return 'status-pass';
+            if (sl.includes('warn')) return 'status-warn';
+            return 'status-fail';
         }
 
         html += '<tr>'
-            + '<td rowspan="3" style="font-weight:700;vertical-align:top;border-right:2px solid rgba(99,102,241,0.3);min-width:90px;">' + (r.rail || 'N/A') + '</td>'
-            + '<td rowspan="3" style="vertical-align:top;border-right:2px solid rgba(99,102,241,0.3);font-size:0.85rem;min-width:120px;">' + (r.component || 'N/A') + '</td>'
+            + '<td rowspan="4" style="font-weight:700;vertical-align:top;border-right:2px solid rgba(99,102,241,0.3);min-width:90px;">' + (r.rail || 'N/A') + '</td>'
+            + '<td rowspan="4" style="vertical-align:top;border-right:2px solid rgba(99,102,241,0.3);font-size:0.85rem;min-width:120px;">' + (r.component || 'N/A') + '</td>'
             + '<td style="font-weight:600;color:#60a5fa;">Voltage Ripple</td>'
             + '<td style="font-size:0.82rem;color:#94a3b8;">' + safeRipple.calculation + '</td>'
             + '<td style="font-weight:700;">' + safeRipple.value + '</td>'
@@ -186,11 +190,18 @@ function buildRailAnalysisTable(rails) {
             + '<td class="' + statusClass(safePsrr.status) + '">' + (safePsrr.status || '—') + '</td>'
             + '</tr>';
 
-        html += '<tr style="border-bottom:3px solid rgba(99,102,241,0.3);">'
+        html += '<tr>'
             + '<td style="font-weight:600;color:#f472b6;">Thermal (Tj)</td>'
             + '<td style="font-size:0.82rem;color:#94a3b8;">' + safeThermal.calculation + '</td>'
             + '<td style="font-weight:700;">' + safeThermal.value + '</td>'
             + '<td class="' + statusClass(safeThermal.status) + '">' + (safeThermal.status || '—') + '</td>'
+            + '</tr>';
+
+        html += '<tr style="border-bottom:3px solid rgba(99,102,241,0.3);">'
+            + '<td style="font-weight:600;color:#fb923c;">Current Derating</td>'
+            + '<td style="font-size:0.82rem;color:#94a3b8;">' + safeDerating.calculation + '</td>'
+            + '<td style="font-weight:700;">' + safeDerating.value + '</td>'
+            + '<td class="' + statusClass(safeDerating.status) + '">' + (safeDerating.status || '—') + '</td>'
             + '</tr>';
     });
 
@@ -414,13 +425,17 @@ function buildReportRailTable(rails) {
 
     rails.forEach(function(r, idx) {
         var bg = idx % 2 === 0 ? '#f8fafc' : '#ffffff';
-        var safeRipple  = r.ripple  || { calculation: 'N/A', value: 'N/A', status: 'N/A' };
-        var safePsrr    = r.psrr    || { calculation: 'N/A', value: 'N/A', status: 'N/A' };
-        var safeThermal = r.thermal || { calculation: 'N/A', value: 'N/A', status: 'N/A' };
+        var safeRipple   = r.ripple    || { calculation: 'N/A', value: 'N/A', status: 'N/A' };
+        var safePsrr     = r.psrr      || { calculation: 'N/A', value: 'N/A', status: 'N/A' };
+        var safeThermal  = r.thermal   || { calculation: 'N/A', value: 'N/A', status: 'N/A' };
+        var safeDerating = r.derating  || { calculation: 'N/A', value: 'N/A', status: 'N/A' };
 
         function sColor(s) {
             if (!s) return '#64748b';
-            return s.toLowerCase().includes('pass') ? '#16a34a' : '#dc2626';
+            var sl = s.toLowerCase();
+            if (sl.includes('pass')) return '#16a34a';
+            if (sl.includes('warn')) return '#d97706';
+            return '#dc2626';
         }
         function statusBadge(s) {
             return '<span style="background:' + sColor(s) + ';color:white;padding:2px 8px;border-radius:999px;font-size:0.8rem;font-weight:bold;">' + (s || '—') + '</span>';
@@ -430,8 +445,8 @@ function buildReportRailTable(rails) {
         var tdCenter = 'style="padding:0.6rem 0.8rem;border:1px solid #e2e8f0;vertical-align:middle;background:' + bg + ';"';
 
         html += '<tr style="background:' + bg + ';">'
-            + '<td ' + td + ' rowspan="3" style="padding:0.6rem 0.8rem;border:1px solid #e2e8f0;vertical-align:middle;font-weight:700;min-width:80px;background:#eff6ff;border-left:4px solid #3b82f6;">' + (r.rail || 'N/A') + '</td>'
-            + '<td ' + td + ' rowspan="3" style="padding:0.6rem 0.8rem;border:1px solid #e2e8f0;vertical-align:middle;font-size:0.82rem;background:#eff6ff;">' + (r.component || 'N/A') + '</td>'
+            + '<td ' + td + ' rowspan="4" style="padding:0.6rem 0.8rem;border:1px solid #e2e8f0;vertical-align:middle;font-weight:700;min-width:80px;background:#eff6ff;border-left:4px solid #3b82f6;">' + (r.rail || 'N/A') + '</td>'
+            + '<td ' + td + ' rowspan="4" style="padding:0.6rem 0.8rem;border:1px solid #e2e8f0;vertical-align:middle;font-size:0.82rem;background:#eff6ff;">' + (r.component || 'N/A') + '</td>'
             + '<td style="padding:0.6rem 0.8rem;border:1px solid #e2e8f0;background:#dbeafe;font-weight:600;color:#1d4ed8;">Voltage Ripple</td>'
             + '<td style="padding:0.6rem 0.8rem;border:1px solid #e2e8f0;font-size:0.82rem;color:#475569;font-family:monospace;">' + safeRipple.calculation + '</td>'
             + '<td style="padding:0.6rem 0.8rem;border:1px solid #e2e8f0;font-weight:700;">' + safeRipple.value + '</td>'
@@ -445,11 +460,18 @@ function buildReportRailTable(rails) {
             + '<td style="padding:0.6rem 0.8rem;border:1px solid #e2e8f0;text-align:center;">' + statusBadge(safePsrr.status) + '</td>'
             + '</tr>';
 
-        html += '<tr style="background:' + bg + ';border-bottom:3px solid #cbd5e1;">'
+        html += '<tr style="background:' + bg + ';">'
             + '<td style="padding:0.6rem 0.8rem;border:1px solid #e2e8f0;background:#fce7f3;font-weight:600;color:#be185d;">Thermal (Tj)</td>'
             + '<td style="padding:0.6rem 0.8rem;border:1px solid #e2e8f0;font-size:0.82rem;color:#475569;font-family:monospace;">' + safeThermal.calculation + '</td>'
             + '<td style="padding:0.6rem 0.8rem;border:1px solid #e2e8f0;font-weight:700;">' + safeThermal.value + '</td>'
             + '<td style="padding:0.6rem 0.8rem;border:1px solid #e2e8f0;text-align:center;">' + statusBadge(safeThermal.status) + '</td>'
+            + '</tr>';
+
+        html += '<tr style="background:' + bg + ';border-bottom:3px solid #cbd5e1;">'
+            + '<td style="padding:0.6rem 0.8rem;border:1px solid #e2e8f0;background:#fff7ed;font-weight:600;color:#c2410c;">Current Derating</td>'
+            + '<td style="padding:0.6rem 0.8rem;border:1px solid #e2e8f0;font-size:0.82rem;color:#475569;font-family:monospace;">' + safeDerating.calculation + '</td>'
+            + '<td style="padding:0.6rem 0.8rem;border:1px solid #e2e8f0;font-weight:700;">' + safeDerating.value + '</td>'
+            + '<td style="padding:0.6rem 0.8rem;border:1px solid #e2e8f0;text-align:center;">' + statusBadge(safeDerating.status) + '</td>'
             + '</tr>';
     });
 

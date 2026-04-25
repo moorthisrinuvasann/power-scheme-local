@@ -388,3 +388,8 @@ input[type="password"]:focus {
     color: #ef4444;
     font-weight: 600;
 }
+
+.status-warn {
+    color: #f59e0b;
+    font-weight: 600;
+}

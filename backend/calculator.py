@@ -72,6 +72,11 @@ def calc_buck_rail(v_in, v_out, i_out, spec, ta, req_ripple_mv, req_psrr_db):
     psrr_buck_db = 46  # typical for high-freq buck
     p_ok = psrr_buck_db >= req_psrr_db
 
+    i_max   = spec["i_max"]
+    derating = i_max / i_out if i_out > 0 else 999
+    d_ok     = derating >= 1.5
+    d_warn   = 1.2 <= derating < 1.5
+
     return {
         "ripple": {
             "calculation": f"D={v_out}/{v_in}={D:.3f}; dIL=({v_in}-{v_out})*{D:.3f}/({f/1e6:.1f}MHz*{spec['l_uh']}uH)={dIL:.3f}A; dV=dIL/(8*{f/1e6:.1f}MHz*{spec['c_out_uf']}uF)={dV_mv:.1f}mV",
@@ -87,6 +92,11 @@ def calc_buck_rail(v_in, v_out, i_out, spec, ta, req_ripple_mv, req_psrr_db):
             "calculation": f"P_diss=(1-{eta})*{v_out}V*{i_out}A={pdiss:.2f}W; Tj={ta}C+{pdiss:.2f}W*{rth}C/W={tj:.1f}C",
             "value": f"{tj:.1f} °C",
             "status": "Pass" if t_ok else "Fail"
+        },
+        "derating": {
+            "calculation": f"I_max={i_max}A / I_load={i_out}A = {derating:.2f}x (required \u22651.5x, recommended \u22651.75x)",
+            "value": f"{derating:.2f}x",
+            "status": "Pass" if d_ok else ("Warn" if d_warn else "Fail")
         }
     }
 
@@ -114,6 +124,11 @@ def calc_ldo_rail(v_in, v_out, i_out, spec, ta, buck_ripple_mv, req_ripple_mv, r
     tj    = ta + pdiss * rth
     t_ok  = tj <= 125.0
 
+    i_max    = spec.get("i_max", 999)
+    derating  = i_max / i_out if i_out > 0 else 999
+    d_ok      = derating >= 1.5
+    d_warn    = 1.2 <= derating < 1.5
+
     return {
         "ripple": {
             "calculation": f"LDO PSRR={psrr_db}dB@{freq_label} (datasheet); Atten=10^({psrr_db}/20)={atten:.0f}x; V_out_rip={buck_ripple_mv:.1f}mV/{atten:.0f}={rip_out_mv:.2f}mV",
@@ -129,6 +144,11 @@ def calc_ldo_rail(v_in, v_out, i_out, spec, ta, buck_ripple_mv, req_ripple_mv, r
             "calculation": f"P_diss=(V_in-V_out)*I_out=({v_in}-{v_out})*{i_out}A={pdiss:.2f}W; Tj={ta}C+{pdiss:.2f}W*{rth}C/W={tj:.1f}C",
             "value": f"{tj:.1f} °C",
             "status": "Pass" if t_ok else "Fail"
+        },
+        "derating": {
+            "calculation": f"I_max={i_max}A / I_load={i_out}A = {derating:.2f}x (required \u22651.5x, recommended \u22651.75x)",
+            "value": f"{derating:.2f}x",
+            "status": "Pass" if d_ok else ("Warn" if d_warn else "Fail")
         }
     }
 
@@ -182,7 +202,8 @@ def calculate_all_rails(rail_assignments: list, req: dict) -> list:
             "component": comp,
             "ripple":    calcs["ripple"],
             "psrr":      calcs["psrr"],
-            "thermal":   calcs["thermal"]
+            "thermal":   calcs["thermal"],
+            "derating":  calcs["derating"],
         })
 
     return result
