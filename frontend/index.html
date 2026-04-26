@@ -56,7 +56,7 @@ Ripple: <15mV" style="width:100%; background: rgba(15,23,42,0.6); border: 1px so
             </div>
 
             <button id="generateBtn" class="primary-btn pulse-hover">
-                Generate Power Scheme
+                ⚡ Generate &amp; Review Components
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
             </button>
         </div>
@@ -64,7 +64,24 @@ Ripple: <15mV" style="width:100%; background: rgba(15,23,42,0.6); border: 1px so
         <!-- Loader -->
         <div id="loader" class="loader-container hidden">
             <div class="spinner"></div>
-            <p>Analyzing requirements and generating scheme...</p>
+            <p>Running AI agent pipeline...</p>
+        </div>
+
+        <!-- ── Phase 4: Component Override Panel ─────────────────────────── -->
+        <div id="overridePanel" class="hidden">
+            <div class="override-header">
+                <div style="display:flex;align-items:center;gap:0.75rem;">
+                    <span style="font-size:1.6rem;">🔧</span>
+                    <div>
+                        <h2 style="margin:0;color:#e2e8f0;font-size:1.3rem;">Review &amp; Override Components</h2>
+                        <p style="margin:0;color:#94a3b8;font-size:0.85rem;">AI has selected components for each rail. Edit any part number before running analysis.</p>
+                    </div>
+                </div>
+                <button id="analyzeBtn" class="analyze-btn">
+                    🔬 Confirm &amp; Run Analysis
+                </button>
+            </div>
+            <div id="overrideContent"></div>
         </div>
 
         <!-- Results Section -->
@@ -74,7 +91,7 @@ Ripple: <15mV" style="width:100%; background: rgba(15,23,42,0.6); border: 1px so
             
             <!-- Final Summary -->
             <div class="result-card" style="margin-top: 1rem; border-color: var(--primary);">
-                <h2>Executive Summary & Comparison</h2>
+                <h2>Executive Summary &amp; Comparison</h2>
                 <p id="finalSummaryText" style="line-height: 1.6; color: var(--text-muted);"></p>
             </div>
 
@@ -92,4 +109,5 @@ Ripple: <15mV" style="width:100%; background: rgba(15,23,42,0.6); border: 1px so
     <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
     <script src="/static/app.js"></script>
 </body>
+</html>
 </html>

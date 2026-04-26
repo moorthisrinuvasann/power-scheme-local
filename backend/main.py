@@ -195,6 +195,161 @@ async def generate_scheme(file: UploadFile = File(...), api_key: str = Form(...)
     return StreamingResponse(stream(), media_type="text/event-stream")
 
 
+# ── Phase 4: Step 1 — Design endpoint (Agents 1-3 only) ─────────────────────
+@app.post("/api/design")
+async def design_scheme(file: UploadFile = File(...), api_key: str = Form(...)):
+    """Runs Agents 1-3 and returns intermediate design for human override."""
+    if not api_key:
+        raise HTTPException(status_code=400, detail="OpenRouter API key is required.")
+    try:
+        content = await file.read()
+        requirements = content.decode('utf-8')
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error reading file: {e}")
+
+    err = validate_requirements(requirements)
+    if err:
+        raise HTTPException(status_code=422, detail=err)
+
+    components = get_all_components()
+
+    async def stream():
+        try:
+            yield sse_event("progress", {"step": 1, "total": 3,
+                "message": "Agent 1/3: Selecting optimal components for each rail..."})
+
+            agent1 = await agent_component_selector(requirements, components, api_key)
+
+            yield sse_event("progress", {"step": 1, "total": 3,
+                "message": f"Agent 1 done — {len(agent1.get('schemes', []))} schemes selected."})
+
+            yield sse_event("progress", {"step": 2, "total": 3,
+                "message": "Agent 2/3: Designing power distribution topology..."})
+
+            agent2 = await agent_topology_designer(requirements, agent1, api_key)
+
+            yield sse_event("progress", {"step": 2, "total": 3,
+                "message": "Agent 2 done — topology finalized."})
+
+            yield sse_event("progress", {"step": 3, "total": 3,
+                "message": "Agent 3/3: Generating schematics..."})
+
+            schemes = agent2.get("schemes", [])
+            mermaid_codes = await agent_schematic_generator(schemes, api_key)
+
+            # Merge Agent 1 component data + schematics into schemes
+            agent1_schemes = agent1.get("schemes", [])
+            for i, scheme in enumerate(schemes):
+                scheme["schematics_mermaid"] = mermaid_codes[i] if i < len(mermaid_codes) else ""
+                if i < len(agent1_schemes):
+                    a1 = agent1_schemes[i]
+                    scheme["selected_components"] = [
+                        {"part_name": sel["component"],
+                         "reasoning":  sel.get("reasoning", ""),
+                         "price":      sel.get("price", 0.0)}
+                        for sel in a1.get("component_selections", [])
+                    ]
+                    scheme["total_price"] = a1.get("total_price", 0.0)
+                else:
+                    scheme["selected_components"] = []
+                    scheme["total_price"] = 0.0
+
+            yield sse_event("progress", {"step": 3, "total": 3,
+                "message": "✅ Agent 3 done — ready for component review."})
+
+            yield sse_event("design_complete", {
+                "requirements": requirements,
+                "final_summary": agent2.get("final_summary", ""),
+                "schemes": schemes,
+            })
+
+        except Exception as e:
+            yield sse_event("error", {"message": str(e)})
+
+    return StreamingResponse(stream(), media_type="text/event-stream")
+
+
+# ── Phase 4: Step 2 — Analyze endpoint (Calculator + DRC + Compare) ──────────
+@app.post("/api/analyze")
+async def analyze_scheme(request: Request):
+    """Runs Calculator, DRC, Correction Agent and Comparator on (possibly modified) schemes."""
+    body = await request.json()
+    requirements = body.get("requirements", "")
+    schemes      = body.get("schemes", [])
+    api_key      = body.get("api_key", "")
+
+    if not api_key:
+        raise HTTPException(status_code=400, detail="OpenRouter API key is required.")
+    if not schemes:
+        raise HTTPException(status_code=400, detail="No schemes provided.")
+
+    req_params = parse_requirements(requirements)
+    components = get_all_components()
+
+    async def stream():
+        try:
+            yield sse_event("progress", {"step": 4, "total": 3,
+                "message": "🧮 Running engineering calculator (ripple / PSRR / thermal / derating)..."})
+
+            for scheme in schemes:
+                rail_assignments = scheme.get("rail_assignments", [])
+                scheme["rail_analysis"] = calculate_all_rails(rail_assignments, req_params)
+
+            yield sse_event("progress", {"step": 5, "total": 3,
+                "message": "🔬 Running Design Rule Check (DRC)..."})
+
+            for scheme in schemes:
+                rail_assignments = scheme.get("rail_assignments", [])
+                drc_violations   = run_drc(rail_assignments, req_params)
+                calc_failures    = check_calc_failures(scheme.get("rail_analysis", []))
+                scheme["drc_violations"] = drc_violations
+                scheme["drc_summary"]    = drc_summary(drc_violations)
+
+                all_issues = drc_violations + calc_failures
+                if all_issues:
+                    yield sse_event("progress", {"step": 5, "total": 3,
+                        "message": f"⚠️ {len(all_issues)} issue(s) in '{scheme.get('scheme_name','')}'. Running correction agent..."})
+                    try:
+                        correction = await agent_correction(
+                            requirements, components,
+                            calc_failures, drc_violations,
+                            rail_assignments, api_key
+                        )
+                        corrected = correction.get("corrected_rails", [])
+                        if corrected:
+                            def _norm(s): return re.sub(r'[^a-z0-9]', '', s.lower())
+                            rail_map = {_norm(r["rail"]): r for r in rail_assignments}
+                            changes  = []
+                            for cr in corrected:
+                                key = _norm(cr.get("rail", ""))
+                                if key in rail_map:
+                                    changes.append(f"{cr['rail']}: {cr.get('change_reason','replaced')}")
+                                    rail_map[key] = cr
+                            scheme["rail_assignments"] = list(rail_map.values())
+                            scheme["correction_log"]   = changes
+                            scheme["rail_analysis"]    = calculate_all_rails(scheme["rail_assignments"], req_params)
+                            new_v = run_drc(scheme["rail_assignments"], req_params)
+                            scheme["drc_violations"]   = new_v
+                            scheme["drc_summary"]      = drc_summary(new_v)
+                    except Exception as corr_err:
+                        scheme["correction_log"] = [f"Correction agent error: {str(corr_err)}"]
+
+            yield sse_event("progress", {"step": 6, "total": 3,
+                "message": "✅ All checks complete. Building final report..."})
+
+            result = {
+                "final_summary": body.get("final_summary", ""),
+                "schemes":       schemes,
+                "comparison":    compare_schemes(schemes),
+            }
+            yield sse_event("result", result)
+
+        except Exception as e:
+            yield sse_event("error", {"message": str(e)})
+
+    return StreamingResponse(stream(), media_type="text/event-stream")
+
+
 # ── Export endpoint: reliable server-side download ───────────────────────────
 @app.post("/api/export")
 async def export_report(request: Request):

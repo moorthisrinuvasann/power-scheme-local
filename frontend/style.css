@@ -393,3 +393,175 @@ input[type="password"]:focus {
     color: #f59e0b;
     font-weight: 600;
 }
+
+/* ── Phase 4: Override Panel ─────────────────────────────────────────────── */
+#overridePanel {
+    margin-top: 2rem;
+    border: 2px solid rgba(99,102,241,0.5);
+    border-radius: 16px;
+    background: rgba(15,23,42,0.8);
+    backdrop-filter: blur(12px);
+    overflow: hidden;
+    animation: slideDown 0.4s ease;
+}
+
+@keyframes slideDown {
+    from { opacity: 0; transform: translateY(-16px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.override-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.25rem 1.5rem;
+    background: rgba(99,102,241,0.12);
+    border-bottom: 1px solid rgba(99,102,241,0.3);
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.analyze-btn {
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    padding: 0.65rem 1.4rem;
+    font-size: 0.95rem;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.2s;
+    box-shadow: 0 4px 12px rgba(16,185,129,0.3);
+    white-space: nowrap;
+}
+
+.analyze-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(16,185,129,0.45);
+}
+
+.analyze-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Scheme tabs inside override panel */
+.override-tabs {
+    display: flex;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    background: rgba(15,23,42,0.5);
+}
+
+.override-tab {
+    padding: 0.75rem 1.25rem;
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: #64748b;
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    transition: all 0.2s;
+    user-select: none;
+}
+
+.override-tab.active {
+    color: #818cf8;
+    border-bottom-color: #818cf8;
+    background: rgba(99,102,241,0.08);
+}
+
+/* Rail rows inside each scheme */
+.override-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.88rem;
+}
+
+.override-table th {
+    padding: 0.6rem 1rem;
+    text-align: left;
+    color: #64748b;
+    font-weight: 600;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+    background: rgba(15,23,42,0.4);
+}
+
+.override-table td {
+    padding: 0.65rem 1rem;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    vertical-align: middle;
+}
+
+.override-table tr:hover td {
+    background: rgba(99,102,241,0.06);
+}
+
+/* Editable component input */
+.comp-input {
+    background: rgba(30,41,59,0.9);
+    border: 1px solid rgba(99,102,241,0.35);
+    border-radius: 8px;
+    color: #e2e8f0;
+    font-family: 'Outfit', monospace;
+    font-size: 0.88rem;
+    padding: 0.35rem 0.65rem;
+    width: 160px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.comp-input:focus {
+    outline: none;
+    border-color: #818cf8;
+    box-shadow: 0 0 0 3px rgba(99,102,241,0.2);
+}
+
+.comp-input.modified {
+    border-color: #f59e0b;
+    background: rgba(245,158,11,0.08);
+}
+
+/* Modified badge */
+.badge-modified {
+    display: inline-block;
+    background: rgba(245,158,11,0.18);
+    color: #fbbf24;
+    border: 1px solid rgba(245,158,11,0.4);
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 1px 7px;
+    margin-left: 4px;
+    letter-spacing: 0.03em;
+}
+
+.badge-ai {
+    display: inline-block;
+    background: rgba(99,102,241,0.15);
+    color: #818cf8;
+    border: 1px solid rgba(99,102,241,0.3);
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 1px 7px;
+    margin-left: 4px;
+}
+
+/* Type badge */
+.type-buck { color: #60a5fa; font-weight: 700; font-size: 0.78rem; }
+.type-ldo  { color: #a78bfa; font-weight: 700; font-size: 0.78rem; }
+
+/* Reset link */
+.reset-link {
+    color: #64748b;
+    font-size: 0.75rem;
+    cursor: pointer;
+    text-decoration: underline;
+    margin-left: 6px;
+    transition: color 0.2s;
+}
+.reset-link:hover { color: #f87171; }
+
