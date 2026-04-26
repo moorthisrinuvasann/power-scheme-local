@@ -56,7 +56,7 @@ Ripple: <15mV" style="width:100%; background: rgba(15,23,42,0.6); border: 1px so
             </div>
 
             <button id="generateBtn" class="primary-btn pulse-hover">
-                ⚡ Generate &amp; Review Components
+                ⚡ Generate Power Scheme
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
             </button>
         </div>
@@ -67,42 +67,67 @@ Ripple: <15mV" style="width:100%; background: rgba(15,23,42,0.6); border: 1px so
             <p>Running AI agent pipeline...</p>
         </div>
 
-        <!-- ── Phase 4: Component Override Panel ─────────────────────────── -->
-        <div id="overridePanel" class="hidden">
-            <div class="override-header">
-                <div style="display:flex;align-items:center;gap:0.75rem;">
-                    <span style="font-size:1.6rem;">🔧</span>
-                    <div>
-                        <h2 style="margin:0;color:#e2e8f0;font-size:1.3rem;">Review &amp; Override Components</h2>
-                        <p style="margin:0;color:#94a3b8;font-size:0.85rem;">AI has selected components for each rail. Edit any part number before running analysis.</p>
-                    </div>
-                </div>
-                <button id="analyzeBtn" class="analyze-btn">
-                    🔬 Confirm &amp; Run Analysis
-                </button>
-            </div>
-            <div id="overrideContent"></div>
-        </div>
-
         <!-- Results Section -->
         <div id="results" class="results-container hidden">
             <!-- Dynamic Schemes Container -->
             <div id="schemesContainer"></div>
-            
+
             <!-- Final Summary -->
             <div class="result-card" style="margin-top: 1rem; border-color: var(--primary);">
                 <h2>Executive Summary &amp; Comparison</h2>
                 <p id="finalSummaryText" style="line-height: 1.6; color: var(--text-muted);"></p>
             </div>
 
+            <!-- ── Phase 4: Refine Design Panel (shown after analysis) ─────── -->
+            <div id="refinePanel" class="hidden">
+                <div class="refine-header">
+                    <div>
+                        <span style="font-size:1.4rem;">🔧</span>
+                        <h2 style="display:inline;margin-left:0.5rem;color:#e2e8f0;font-size:1.2rem;vertical-align:middle;">Refine Design</h2>
+                        <p style="color:#94a3b8;font-size:0.85rem;margin:0.3rem 0 0 0;">Review analysis results above, then choose how to improve the design.</p>
+                    </div>
+                </div>
+
+                <!-- Tab: Override Components | Re-generate -->
+                <div class="refine-tabs">
+                    <div class="refine-tab active" id="tabOverride" onclick="switchRefineTab('override')">✏️ Override Components &amp; Re-analyze</div>
+                    <div class="refine-tab" id="tabRegenerate" onclick="switchRefineTab('regen')">🔄 Add Constraints &amp; Re-generate</div>
+                </div>
+
+                <!-- Override pane -->
+                <div id="refineOverridePane" style="padding:1rem 1.5rem 1.5rem;">
+                    <p style="color:#94a3b8;font-size:0.83rem;margin-bottom:1rem;">
+                        ⚠️ Failed rails are <span style="color:#f87171;font-weight:700;">highlighted in red</span>.
+                        Edit any component name below, then click Re-analyze.
+                    </p>
+                    <div id="overrideContent"></div>
+                    <button id="analyzeBtn" class="analyze-btn" style="margin-top:1.2rem;">
+                        🔬 Re-analyze with My Changes
+                    </button>
+                </div>
+
+                <!-- Re-generate pane -->
+                <div id="refineRegenPane" style="padding:1rem 1.5rem 1.5rem; display:none;">
+                    <p style="color:#94a3b8;font-size:0.83rem;margin-bottom:0.75rem;">
+                        Add new constraints or corrections. They will be appended to your original requirements before a full re-generation.
+                    </p>
+                    <textarea id="extraConstraints" rows="5"
+                        placeholder="e.g.: Use only Analog Devices components.&#10;Ensure all derating margins &gt; 2x.&#10;Add an extra 1.2V rail at 500mA."
+                        style="width:100%;background:rgba(15,23,42,0.7);border:1px solid rgba(99,102,241,0.4);border-radius:10px;padding:0.75rem;color:#e2e8f0;font-size:0.88rem;font-family:monospace;resize:vertical;outline:none;">
+                    </textarea>
+                    <button id="regenBtn" class="analyze-btn" style="margin-top:1rem;background:linear-gradient(135deg,#6366f1,#4f46e5);">
+                        🔄 Re-generate with New Constraints
+                    </button>
+                </div>
+            </div>
+
             <!-- Export Actions -->
-            <div class="result-card" style="text-align: center; background: rgba(139, 92, 246, 0.1);">
+            <div class="result-card" style="text-align: center; background: rgba(139, 92, 246, 0.1); margin-top:1.5rem;">
                 <button id="downloadBtn" class="primary-btn pulse-hover" style="margin: 0 auto;">
                     Download HTML Report
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
                 </button>
             </div>
-
         </div>
     </div>
 

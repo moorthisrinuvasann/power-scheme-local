@@ -25,24 +25,31 @@ SYS_JSON = "You output strictly valid JSON only. No markdown fences, no comments
 
 
 async def _llm(client, prompt: str) -> str:
-    """Single LLM call with 60s timeout, returns raw text."""
-    resp = await asyncio.wait_for(
-        client.chat.completions.create(
-            model="openrouter/auto",
-            messages=[
-                {"role": "system", "content": SYS_JSON},
-                {"role": "user",   "content": prompt},
-            ],
-            extra_headers=HEADERS,
-        ),
-        timeout=60.0,
-    )
-    return resp.choices[0].message.content
+    """Single LLM call with 180s timeout, returns raw text."""
+    try:
+        resp = await asyncio.wait_for(
+            client.chat.completions.create(
+                model="openrouter/auto",
+                messages=[
+                    {"role": "system", "content": SYS_JSON},
+                    {"role": "user",   "content": prompt},
+                ],
+                extra_headers=HEADERS,
+            ),
+            timeout=180.0,
+        )
+        return resp.choices[0].message.content
+    except asyncio.TimeoutError:
+        raise RuntimeError("LLM call timed out after 180s. OpenRouter may be slow — please retry.")
 
 
 def _extract_json(text: str):
     """Robustly pull the first JSON object or array from LLM text."""
     text = text.strip()
+    # Strip markdown fences if present
+    if text.startswith('```'):
+        text = '\n'.join(text.split('\n')[1:])
+        text = text.rstrip('`').strip()
     # Try object first, then array
     for open_c, close_c in [('{', '}'), ('[', ']')]:
         s = text.find(open_c)
@@ -50,9 +57,9 @@ def _extract_json(text: str):
         if s != -1 and e != -1 and e > s:
             try:
                 return json.loads(text[s:e+1])
-            except json.JSONDecodeError:
+            except json.JSONDecodeError as je:
                 continue
-    raise ValueError(f"No valid JSON found in LLM response: {text[:300]}")
+    raise ValueError(f"LLM returned non-JSON. First 300 chars: {text[:300]}")
 
 
 # ── Smart DB Filter (Phase 3) ─────────────────────────────────────────────────

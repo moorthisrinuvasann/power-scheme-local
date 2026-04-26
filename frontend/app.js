@@ -27,9 +27,10 @@ document.addEventListener('change', function(e) {
 });
 
 // Phase 4 state
-var designData = null;  // stores result of /api/design (pre-override)
+var designData    = null;   // last full result (schemes + requirements)
+var originalReqs  = '';     // original requirements text (for re-generate)
 
-// Generate button → Phase A: run /api/design (Agents 1-3)
+// ── Generate button → full pipeline /api/generate ────────────────────────────
 document.getElementById('generateBtn').onclick = function() {
     var apiKey  = document.getElementById('apiKey').value.trim();
     var reqText = document.getElementById('reqText').value.trim();
@@ -37,23 +38,26 @@ document.getElementById('generateBtn').onclick = function() {
     if (!apiKey)  { alert('Please enter your OpenRouter API key.'); return; }
     if (!reqText) { alert('Please enter requirements in the text area or upload a file.'); return; }
 
-    // Reset UI
+    originalReqs = reqText;
+    runGenerate(apiKey, reqText);
+};
+
+function runGenerate(apiKey, reqText) {
     document.getElementById('loader').classList.remove('hidden');
     document.getElementById('results').classList.add('hidden');
-    document.getElementById('overridePanel').classList.add('hidden');
     document.getElementById('generateBtn').disabled = true;
 
     var old = document.getElementById('agentProgress');
     if (old) old.remove();
 
-    updateProgress(0, 3, 'Starting AI agent pipeline...');
+    updateProgress(0, 6, 'Starting AI agent pipeline...');
 
     var blob = new Blob([reqText], { type: 'text/plain' });
     var formData = new FormData();
     formData.append('file', blob, 'requirements.txt');
     formData.append('api_key', apiKey);
 
-    fetch('/api/design', { method: 'POST', body: formData })
+    fetch('/api/generate', { method: 'POST', body: formData })
     .then(function(response) {
         if (!response.ok) {
             return response.json().then(function(err) {
@@ -68,216 +72,6 @@ document.getElementById('generateBtn').onclick = function() {
             return reader.read().then(function(chunk) {
                 if (chunk.done) return;
                 buffer += decoder.decode(chunk.value, { stream: true });
-
-                var events = buffer.split('\n\n');
-                buffer = events.pop();
-
-                events.forEach(function(eventBlock) {
-                    if (!eventBlock.trim()) return;
-                    var eventType = '', dataLines = [];
-                    eventBlock.split('\n').forEach(function(line) {
-                        if (line.startsWith('event:')) eventType = line.slice(6).trim();
-                        else if (line.startsWith('data:')) dataLines.push(line.slice(5).trim());
-                    });
-                    if (!eventType || !dataLines.length) return;
-                    var jsonStr = dataLines.join('');
-                    if (!jsonStr) return;
-
-                    try {
-                        var payload = JSON.parse(jsonStr);
-                        if (eventType === 'progress') {
-                            updateProgress(payload.step, payload.total, payload.message);
-                        } else if (eventType === 'design_complete') {
-                            // Phase B: show override panel
-                            designData = payload;
-                            document.getElementById('loader').classList.add('hidden');
-                            document.getElementById('generateBtn').disabled = false;
-                            showOverridePanel(payload);
-                        } else if (eventType === 'error') {
-                            alert('Error: ' + payload.message);
-                            document.getElementById('loader').classList.add('hidden');
-                            document.getElementById('generateBtn').disabled = false;
-                        }
-                    } catch(e) {
-                        console.warn('SSE parse error:', e.message, jsonStr.slice(0,200));
-                    }
-                });
-                return read();
-            });
-        }
-        return read();
-    })
-    .catch(function(err) {
-        alert('Error: ' + err.message);
-        console.error(err);
-        document.getElementById('loader').classList.add('hidden');
-        document.getElementById('generateBtn').disabled = false;
-    });
-};
-
-// ── Phase B: Build & show the override panel ───────────────────────────────
-function showOverridePanel(data) {
-    var schemes = data.schemes || [];
-    var content = document.getElementById('overrideContent');
-    content.innerHTML = '';
-
-    // Scheme tabs
-    var tabs = document.createElement('div');
-    tabs.className = 'override-tabs';
-
-    var panes = [];
-
-    schemes.forEach(function(s, si) {
-        // Tab
-        var tab = document.createElement('div');
-        tab.className = 'override-tab' + (si === 0 ? ' active' : '');
-        tab.textContent = s.scheme_name || ('Scheme ' + (si + 1));
-        tab.dataset.idx = si;
-        tabs.appendChild(tab);
-
-        // Pane
-        var pane = document.createElement('div');
-        pane.id = 'override-pane-' + si;
-        pane.style.display = si === 0 ? 'block' : 'none';
-        pane.style.padding = '1rem 0';
-
-        var rails = s.rail_assignments || [];
-        var table = '<table class="override-table">'
-            + '<thead><tr>'
-            + '<th>Rail</th><th>V_out</th><th>I_out</th><th>Type</th>'
-            + '<th>Component (AI Selected)</th><th>V_in</th>'
-            + '</tr></thead><tbody>';
-
-        rails.forEach(function(ra, ri) {
-            var ctype = (ra.comp_type || ra.component_type || 'buck').toLowerCase();
-            var typeHtml = ctype === 'ldo'
-                ? '<span class="type-ldo">LDO</span>'
-                : '<span class="type-buck">BUCK</span>';
-            var inputId = 'comp-s' + si + '-r' + ri;
-            table += '<tr>'
-                + '<td style="color:#e2e8f0;font-weight:600;">' + (ra.rail || '—') + '</td>'
-                + '<td style="color:#60a5fa;">' + (ra.v_out || '?') + ' V</td>'
-                + '<td style="color:#34d399;">' + (ra.i_out || '?') + ' A</td>'
-                + '<td>' + typeHtml + '</td>'
-                + '<td>'
-                +   '<input id="' + inputId + '" class="comp-input" '
-                +   'data-original="' + (ra.component || '') + '" '
-                +   'data-scheme="' + si + '" data-rail="' + ri + '" '
-                +   'value="' + (ra.component || '') + '" '
-                +   'placeholder="Part number..." />'
-                +   '<span class="badge-ai">AI</span>'
-                +   '<span class="reset-link" data-input="' + inputId + '">reset</span>'
-                + '</td>'
-                + '<td style="color:#94a3b8;">' + (ra.v_in || '?') + ' V</td>'
-                + '</tr>';
-        });
-        table += '</tbody></table>';
-        pane.innerHTML = table;
-        panes.push(pane);
-        content.appendChild(pane);
-    });
-
-    content.insertBefore(tabs, content.firstChild);
-
-    // Tab switching
-    tabs.addEventListener('click', function(e) {
-        var t = e.target.closest('.override-tab');
-        if (!t) return;
-        var idx = parseInt(t.dataset.idx);
-        tabs.querySelectorAll('.override-tab').forEach(function(x){ x.classList.remove('active'); });
-        t.classList.add('active');
-        panes.forEach(function(p, i){ p.style.display = i === idx ? 'block' : 'none'; });
-    });
-
-    // Live edit → highlight modified inputs
-    content.addEventListener('input', function(e) {
-        if (!e.target.classList.contains('comp-input')) return;
-        var original = e.target.dataset.original;
-        var modified = e.target.value.trim() !== original;
-        e.target.classList.toggle('modified', modified);
-        // Update badge
-        var badge = e.target.nextElementSibling;
-        if (badge) badge.className = modified ? 'badge-modified' : 'badge-ai';
-        if (badge) badge.textContent = modified ? 'EDITED' : 'AI';
-    });
-
-    // Reset link
-    content.addEventListener('click', function(e) {
-        if (!e.target.classList.contains('reset-link')) return;
-        var inp = document.getElementById(e.target.dataset.input);
-        if (inp) {
-            inp.value = inp.dataset.original;
-            inp.classList.remove('modified');
-            var badge = inp.nextElementSibling;
-            if (badge) { badge.className = 'badge-ai'; badge.textContent = 'AI'; }
-        }
-    });
-
-    document.getElementById('overridePanel').classList.remove('hidden');
-    document.getElementById('overridePanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
-}
-
-// ── Phase C: Analyze button → collect overrides → call /api/analyze ──────────
-document.getElementById('analyzeBtn').onclick = function() {
-    if (!designData) { alert('Please generate a design first.'); return; }
-
-    var apiKey = document.getElementById('apiKey').value.trim();
-    if (!apiKey) { alert('Please enter your OpenRouter API key.'); return; }
-
-    // Collect any user overrides from inputs
-    var schemes = JSON.parse(JSON.stringify(designData.schemes || []));
-    var overrideCount = 0;
-
-    document.querySelectorAll('.comp-input').forEach(function(inp) {
-        var si   = parseInt(inp.dataset.scheme);
-        var ri   = parseInt(inp.dataset.rail);
-        var newVal = inp.value.trim();
-        if (newVal && newVal !== inp.dataset.original) {
-            schemes[si].rail_assignments[ri].component = newVal;
-            overrideCount++;
-        }
-    });
-
-    if (overrideCount > 0) {
-        console.log('Phase 4: ' + overrideCount + ' component override(s) applied.');
-    }
-
-    // Show loader for phase C
-    document.getElementById('loader').classList.remove('hidden');
-    document.getElementById('overridePanel').classList.add('hidden');
-    document.getElementById('results').classList.add('hidden');
-    document.getElementById('analyzeBtn').disabled = true;
-    document.getElementById('generateBtn').disabled = true;
-
-    var old = document.getElementById('agentProgress');
-    if (old) old.remove();
-    updateProgress(0, 3, '🧮 Running engineering analysis...');
-
-    fetch('/api/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            requirements:  designData.requirements || '',
-            final_summary: designData.final_summary || '',
-            schemes:       schemes,
-            api_key:       apiKey,
-        })
-    })
-    .then(function(response) {
-        if (!response.ok) {
-            return response.json().then(function(err) {
-                throw new Error(err.detail || 'Server error ' + response.status);
-            });
-        }
-        var reader  = response.body.getReader();
-        var decoder = new TextDecoder();
-        var buffer  = '';
-
-        function read() {
-            return reader.read().then(function(chunk) {
-                if (chunk.done) return;
-                buffer += decoder.decode(chunk.value, { stream: true });
-
                 var events = buffer.split('\n\n');
                 buffer = events.pop();
 
@@ -298,26 +92,20 @@ document.getElementById('analyzeBtn').onclick = function() {
                             updateProgress(payload.step, payload.total, payload.message);
                         } else if (eventType === 'result') {
                             lastGeneratedData = payload;
+                            designData = payload;
                             renderResults(payload);
                             document.getElementById('loader').classList.add('hidden');
                             document.getElementById('results').classList.remove('hidden');
-                            document.getElementById('analyzeBtn').disabled = false;
                             document.getElementById('generateBtn').disabled = false;
-                            if (overrideCount > 0) {
-                                var notice = document.createElement('div');
-                                notice.style.cssText = 'background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.4);border-radius:10px;padding:0.75rem 1rem;margin-bottom:1rem;color:#fbbf24;font-size:0.88rem;';
-                                notice.innerHTML = '✏️ <strong>' + overrideCount + ' component override(s)</strong> were applied before analysis.';
-                                document.getElementById('schemesContainer').insertAdjacentElement('beforebegin', notice);
-                            }
+                            // Build refine panel after results are visible
+                            buildRefinePanel(payload);
                         } else if (eventType === 'error') {
-                            alert('Analysis Error: ' + payload.message);
+                            alert('Error: ' + payload.message);
                             document.getElementById('loader').classList.add('hidden');
-                            document.getElementById('overridePanel').classList.remove('hidden');
-                            document.getElementById('analyzeBtn').disabled = false;
                             document.getElementById('generateBtn').disabled = false;
                         }
                     } catch(e) {
-                        console.warn('SSE parse error:', e.message, jsonStr.slice(0,200));
+                        console.warn('SSE parse error:', e.message, jsonStr.slice(0, 200));
                     }
                 });
                 return read();
@@ -326,12 +114,236 @@ document.getElementById('analyzeBtn').onclick = function() {
         return read();
     })
     .catch(function(err) {
-        alert('Analysis Error: ' + err.message);
+        alert('Error: ' + err.message);
+        console.error(err);
         document.getElementById('loader').classList.add('hidden');
-        document.getElementById('overridePanel').classList.remove('hidden');
+        document.getElementById('generateBtn').disabled = false;
+    });
+}
+
+// ── Build the post-analysis Refine Design panel ───────────────────────────────
+function buildRefinePanel(data) {
+    var schemes = data.schemes || [];
+    var content = document.getElementById('overrideContent');
+    content.innerHTML = '';
+
+    // Collect failed rails from drc_violations and rail_analysis
+    var failedRails = {};
+    schemes.forEach(function(s) {
+        (s.drc_violations || []).forEach(function(v) {
+            if (v.severity === 'ERROR') failedRails[v.rail] = true;
+        });
+        (s.rail_analysis || []).forEach(function(ra) {
+            if (ra.derating_ok === false || ra.thermal_ok === false || ra.ripple_ok === false) {
+                failedRails[ra.rail] = true;
+            }
+        });
+    });
+
+    // Build per-scheme tabs + tables
+    var tabs = document.createElement('div');
+    tabs.className = 'override-tabs';
+    var panes = [];
+
+    schemes.forEach(function(s, si) {
+        var tab = document.createElement('div');
+        tab.className = 'override-tab' + (si === 0 ? ' active' : '');
+        tab.textContent = s.scheme_name || ('Scheme ' + (si + 1));
+        tab.dataset.idx = si;
+        tabs.appendChild(tab);
+
+        var pane = document.createElement('div');
+        pane.id = 'refine-pane-' + si;
+        pane.style.display = si === 0 ? 'block' : 'none';
+
+        var rails = s.rail_assignments || [];
+        var table = '<table class="override-table"><thead><tr>'
+            + '<th>Rail</th><th>V_out</th><th>I_out</th><th>Type</th>'
+            + '<th>Component</th><th>Status</th>'
+            + '</tr></thead><tbody>';
+
+        rails.forEach(function(ra, ri) {
+            var isFailed = failedRails[ra.rail] || false;
+            var ctype    = (ra.comp_type || ra.component_type || 'buck').toLowerCase();
+            var typeHtml = ctype === 'ldo'
+                ? '<span class="type-ldo">LDO</span>'
+                : '<span class="type-buck">BUCK</span>';
+            var inputId  = 'rcomp-s' + si + '-r' + ri;
+            var rowStyle = isFailed ? 'background:rgba(239,68,68,0.07);' : '';
+            var statusHtml = isFailed
+                ? '<span style="color:#f87171;font-weight:700;font-size:0.8rem;">⚠ FAILED</span>'
+                : '<span style="color:#10b981;font-size:0.8rem;">✓ OK</span>';
+
+            table += '<tr style="' + rowStyle + '">'
+                + '<td style="color:' + (isFailed ? '#f87171' : '#e2e8f0') + ';font-weight:600;">' + (ra.rail || '—') + '</td>'
+                + '<td style="color:#60a5fa;">' + (ra.v_out || '?') + ' V</td>'
+                + '<td style="color:#34d399;">' + (ra.i_out || '?') + ' A</td>'
+                + '<td>' + typeHtml + '</td>'
+                + '<td>'
+                +   '<input id="' + inputId + '" class="comp-input' + (isFailed ? ' modified' : '') + '" '
+                +   'data-original="' + (ra.component || '') + '" '
+                +   'data-scheme="' + si + '" data-rail="' + ri + '" '
+                +   'value="' + (ra.component || '') + '" placeholder="Part number..." />'
+                +   '<span class="reset-link" data-input="' + inputId + '">reset</span>'
+                + '</td>'
+                + '<td>' + statusHtml + '</td>'
+                + '</tr>';
+        });
+        table += '</tbody></table>';
+        pane.innerHTML = table;
+        panes.push(pane);
+        content.appendChild(pane);
+    });
+
+    content.insertBefore(tabs, content.firstChild);
+
+    // Tab switching
+    tabs.addEventListener('click', function(e) {
+        var t = e.target.closest('.override-tab');
+        if (!t) return;
+        var idx = parseInt(t.dataset.idx);
+        tabs.querySelectorAll('.override-tab').forEach(function(x){ x.classList.remove('active'); });
+        t.classList.add('active');
+        panes.forEach(function(p, i){ p.style.display = i === idx ? 'block' : 'none'; });
+    });
+
+    // Live highlight on edit
+    content.addEventListener('input', function(e) {
+        if (!e.target.classList.contains('comp-input')) return;
+        e.target.classList.toggle('modified', e.target.value.trim() !== e.target.dataset.original);
+    });
+
+    // Reset link
+    content.addEventListener('click', function(e) {
+        if (!e.target.classList.contains('reset-link')) return;
+        var inp = document.getElementById(e.target.dataset.input);
+        if (inp) { inp.value = inp.dataset.original; inp.classList.remove('modified'); }
+    });
+
+    document.getElementById('refinePanel').classList.remove('hidden');
+}
+
+// ── Tab switcher for Refine panel ─────────────────────────────────────────────
+function switchRefineTab(tab) {
+    document.getElementById('tabOverride').classList.toggle('active', tab === 'override');
+    document.getElementById('tabRegenerate').classList.toggle('active', tab === 'regen');
+    document.getElementById('refineOverridePane').style.display = tab === 'override' ? 'block' : 'none';
+    document.getElementById('refineRegenPane').style.display    = tab === 'regen'    ? 'block' : 'none';
+}
+
+// ── Re-analyze button: collect overrides → /api/analyze ──────────────────────
+document.getElementById('analyzeBtn').onclick = function() {
+    if (!designData) { alert('No design data. Please generate first.'); return; }
+    var apiKey = document.getElementById('apiKey').value.trim();
+    if (!apiKey) { alert('Please enter your OpenRouter API key.'); return; }
+
+    var schemes = JSON.parse(JSON.stringify(designData.schemes || []));
+    var overrideCount = 0;
+
+    document.querySelectorAll('.comp-input').forEach(function(inp) {
+        var si  = parseInt(inp.dataset.scheme);
+        var ri  = parseInt(inp.dataset.rail);
+        var val = inp.value.trim();
+        if (val && val !== inp.dataset.original) {
+            schemes[si].rail_assignments[ri].component = val;
+            overrideCount++;
+        }
+    });
+
+    if (overrideCount === 0 && !confirm('No components were changed. Re-analyze anyway?')) return;
+
+    document.getElementById('loader').classList.remove('hidden');
+    document.getElementById('results').classList.add('hidden');
+    document.getElementById('analyzeBtn').disabled = true;
+    document.getElementById('generateBtn').disabled = true;
+
+    var old = document.getElementById('agentProgress');
+    if (old) old.remove();
+    updateProgress(0, 3, '🧮 Re-running engineering analysis...');
+
+    fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            requirements:  originalReqs,
+            final_summary: designData.final_summary || '',
+            schemes:       schemes,
+            api_key:       apiKey,
+        })
+    })
+    .then(function(response) {
+        if (!response.ok) return response.json().then(function(err) { throw new Error(err.detail || 'Server error ' + response.status); });
+        var reader = response.body.getReader();
+        var decoder = new TextDecoder();
+        var buffer  = '';
+
+        function read() {
+            return reader.read().then(function(chunk) {
+                if (chunk.done) return;
+                buffer += decoder.decode(chunk.value, { stream: true });
+                var events = buffer.split('\n\n');
+                buffer = events.pop();
+                events.forEach(function(eventBlock) {
+                    if (!eventBlock.trim()) return;
+                    var eventType = '', dataLines = [];
+                    eventBlock.split('\n').forEach(function(line) {
+                        if (line.startsWith('event:')) eventType = line.slice(6).trim();
+                        else if (line.startsWith('data:')) dataLines.push(line.slice(5).trim());
+                    });
+                    if (!eventType || !dataLines.length) return;
+                    try {
+                        var payload = JSON.parse(dataLines.join(''));
+                        if (eventType === 'progress') {
+                            updateProgress(payload.step, payload.total, payload.message);
+                        } else if (eventType === 'result') {
+                            lastGeneratedData = payload;
+                            designData = payload;
+                            renderResults(payload);
+                            document.getElementById('loader').classList.add('hidden');
+                            document.getElementById('results').classList.remove('hidden');
+                            document.getElementById('analyzeBtn').disabled = false;
+                            document.getElementById('generateBtn').disabled = false;
+                            buildRefinePanel(payload);
+                            if (overrideCount > 0) {
+                                var n = document.createElement('div');
+                                n.style.cssText = 'background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.4);border-radius:10px;padding:0.65rem 1rem;margin-bottom:1rem;color:#fbbf24;font-size:0.85rem;';
+                                n.innerHTML = '✏️ <strong>' + overrideCount + ' component override(s)</strong> applied in this re-analysis.';
+                                document.getElementById('schemesContainer').insertAdjacentElement('beforebegin', n);
+                            }
+                        } else if (eventType === 'error') {
+                            alert('Re-analysis Error: ' + payload.message);
+                            document.getElementById('loader').classList.add('hidden');
+                            document.getElementById('results').classList.remove('hidden');
+                            document.getElementById('analyzeBtn').disabled = false;
+                            document.getElementById('generateBtn').disabled = false;
+                        }
+                    } catch(e) { console.warn('SSE parse error:', e.message); }
+                });
+                return read();
+            });
+        }
+        return read();
+    })
+    .catch(function(err) {
+        alert('Re-analysis Error: ' + err.message);
+        document.getElementById('loader').classList.add('hidden');
+        document.getElementById('results').classList.remove('hidden');
         document.getElementById('analyzeBtn').disabled = false;
         document.getElementById('generateBtn').disabled = false;
     });
+};
+
+// ── Re-generate button: append constraints → full pipeline ────────────────────
+document.getElementById('regenBtn').onclick = function() {
+    var apiKey = document.getElementById('apiKey').value.trim();
+    if (!apiKey) { alert('Please enter your OpenRouter API key.'); return; }
+    var extra = document.getElementById('extraConstraints').value.trim();
+    if (!extra) { alert('Please enter additional constraints before re-generating.'); return; }
+
+    var combined = originalReqs + '\n\n--- Additional Constraints ---\n' + extra;
+    document.getElementById('reqText').value = combined;
+    originalReqs = combined;
+    runGenerate(apiKey, combined);
 };
 
 // ── Live progress bar ─────────────────────────────────────────────────────────

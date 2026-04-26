@@ -190,7 +190,7 @@ async def generate_scheme(file: UploadFile = File(...), api_key: str = Form(...)
             yield sse_event("result", result)
 
         except Exception as e:
-            yield sse_event("error", {"message": str(e)})
+            yield sse_event("error", {"message": f"{type(e).__name__}: {e}"})
 
     return StreamingResponse(stream(), media_type="text/event-stream")
 
