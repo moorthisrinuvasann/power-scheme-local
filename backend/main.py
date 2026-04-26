@@ -288,14 +288,14 @@ async def analyze_scheme(request: Request):
 
     async def stream():
         try:
-            yield sse_event("progress", {"step": 4, "total": 3,
+            yield sse_event("progress", {"step": 1, "total": 3,
                 "message": "🧮 Running engineering calculator (ripple / PSRR / thermal / derating)..."})
 
             for scheme in schemes:
                 rail_assignments = scheme.get("rail_assignments", [])
                 scheme["rail_analysis"] = calculate_all_rails(rail_assignments, req_params)
 
-            yield sse_event("progress", {"step": 5, "total": 3,
+            yield sse_event("progress", {"step": 2, "total": 3,
                 "message": "🔬 Running Design Rule Check (DRC)..."})
 
             for scheme in schemes:
@@ -307,7 +307,7 @@ async def analyze_scheme(request: Request):
 
                 all_issues = drc_violations + calc_failures
                 if all_issues:
-                    yield sse_event("progress", {"step": 5, "total": 3,
+                    yield sse_event("progress", {"step": 2, "total": 3,
                         "message": f"⚠️ {len(all_issues)} issue(s) in '{scheme.get('scheme_name','')}'. Running correction agent..."})
                     try:
                         correction = await agent_correction(
@@ -334,7 +334,7 @@ async def analyze_scheme(request: Request):
                     except Exception as corr_err:
                         scheme["correction_log"] = [f"Correction agent error: {str(corr_err)}"]
 
-            yield sse_event("progress", {"step": 6, "total": 3,
+            yield sse_event("progress", {"step": 3, "total": 3,
                 "message": "✅ All checks complete. Building final report..."})
 
             result = {
