@@ -1,8 +1,9 @@
 // Initialize mermaid
 mermaid.initialize({ startOnLoad: false, theme: 'default' });
 
-// Store mermaid codes and full LLM data for export
+// Store mermaid codes, rendered SVGs and full LLM data for export
 var rawMermaidCodes = [];
+var rawMermaidSVGs  = [];   // pre-rendered SVGs — embedded directly in report
 var lastGeneratedData = null;
 
 // File reader - populates textarea from file
@@ -443,6 +444,7 @@ function buildFallbackMermaid(railAssignments) {
 // ── Render results in the browser ─────────────────────────────────────────────
 async function renderResults(data) {
     rawMermaidCodes = [];
+    rawMermaidSVGs  = [];
     document.getElementById('finalSummaryText').textContent = data.final_summary || '';
     var container = document.getElementById('schemesContainer');
     container.innerHTML = '';
@@ -479,6 +481,7 @@ async function renderResults(data) {
                 svgOut = '<pre style="text-align:left;font-size:0.78rem;color:#94a3b8;overflow-x:auto;white-space:pre-wrap;padding:0.5rem;background:rgba(0,0,0,0.3);border-radius:8px;">' + mCode + '</pre>';
             }
         }
+        rawMermaidSVGs[i] = svgOut;   // ← store for HTML report
 
         var block = '<div class="scheme-block" style="margin-bottom:3rem;border:2px solid var(--primary);padding:2rem;border-radius:16px;background:rgba(30,41,59,0.4);">'
             + '<h2 style="color:var(--primary);font-size:1.5rem;margin-bottom:0.5rem;">' + (s.scheme_name || 'Scheme ' + (i+1))
@@ -701,7 +704,7 @@ document.getElementById('downloadBtn').onclick = function() {
                 + '<h2>' + (s.scheme_name || 'Scheme '+(i+1)) + ' <span class="price-badge">Total: INR ' + (s.total_price||0) + '</span></h2>'
                 + '<p class="freq-info"><strong>Switching Frequency:</strong> ' + (s.switching_frequency||'N/A') + '</p>'
                 + drcHtml
-                + '<div class="card"><h3>Schematics</h3><div class="mermaid">' + mCode + '</div></div>'
+                + '<div class="card"><h3>Schematics</h3><div style="overflow-x:auto;">' + (rawMermaidSVGs[i] || '<p style="color:#64748b;">No diagram available.</p>') + '</div></div>'
                 + '<div class="card"><h3>Selected Components</h3>' + componentsHtml + '</div>'
                 + '<div class="card"><h3>Engineering Analysis — Per Rail</h3>' + railTableHtml + '</div>'
                 + '</div>';
@@ -711,9 +714,9 @@ document.getElementById('downloadBtn').onclick = function() {
             + '<meta charset="UTF-8">\n'
             + '<meta name="viewport" content="width=device-width, initial-scale=1.0">\n'
             + '<title>Power Scheme Engineering Report</title>\n'
-            + '<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"><\/script>\n'
-            + '<script>mermaid.initialize({startOnLoad:true,theme:"default",securityLevel:"loose"});<\/script>\n'
             + '<style>\n'
+            + '  /* SVGs are pre-rendered and embedded — no mermaid.js needed */\n'
+            + '  svg { max-width: 100%; height: auto; display: block; margin: 0 auto; }\n'
             + '  * { box-sizing: border-box; margin: 0; padding: 0; }\n'
             + '  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 1300px; margin: 0 auto; padding: 2rem; background: #f1f5f9; color: #1e293b; }\n'
             + '  h1 { font-size: 2rem; color: #1d4ed8; border-bottom: 3px solid #3b82f6; padding-bottom: 0.75rem; margin-bottom: 0.5rem; }\n'
