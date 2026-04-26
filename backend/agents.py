@@ -46,21 +46,49 @@ async def _llm(client, prompt: str, max_tokens: int = 4000) -> str:
 
 def _extract_json(text: str):
     """Robustly pull the first JSON object or array from LLM text."""
+    import re
+    original = text
     text = text.strip()
-    # Strip markdown fences if present
-    if text.startswith('```'):
-        text = '\n'.join(text.split('\n')[1:])
-        text = text.rstrip('`').strip()
-    # Try object first, then array
+
+    # Strategy 1: strip ALL markdown fences (```json ... ``` or ``` ... ```)
+    text = re.sub(r'^```[a-zA-Z]*\s*', '', text)
+    text = re.sub(r'\s*```$', '', text).strip()
+
+    # Strategy 2: try direct parse first
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+
+    # Strategy 3: find first { } or [ ] block by scanning
     for open_c, close_c in [('{', '}'), ('[', ']')]:
         s = text.find(open_c)
-        e = text.rfind(close_c)
-        if s != -1 and e != -1 and e > s:
-            try:
-                return json.loads(text[s:e+1])
-            except json.JSONDecodeError as je:
-                continue
-    raise ValueError(f"LLM returned non-JSON. First 300 chars: {text[:300]}")
+        if s == -1:
+            continue
+        # Walk forward to find matching close bracket
+        depth = 0
+        for i, ch in enumerate(text[s:], start=s):
+            if ch == open_c:
+                depth += 1
+            elif ch == close_c:
+                depth -= 1
+                if depth == 0:
+                    candidate = text[s:i+1]
+                    try:
+                        return json.loads(candidate)
+                    except json.JSONDecodeError:
+                        break  # malformed — try next strategy
+
+    # Strategy 4: regex scan for json-like block
+    m = re.search(r'(\{[\s\S]+\}|\[[\s\S]+\])', text)
+    if m:
+        try:
+            return json.loads(m.group(1))
+        except json.JSONDecodeError:
+            pass
+
+    print(f"[WARN] _extract_json failed. Raw response (first 400 chars):\n{original[:400]}")
+    raise ValueError(f"LLM returned non-JSON. First 300 chars: {original[:300]}")
 
 
 # ── Smart DB Filter (Phase 3) ─────────────────────────────────────────────────
@@ -320,6 +348,11 @@ Return ONLY valid JSON:
 }}"""
     client = _make_client(api_key)
     raw = await _llm(client, prompt, max_tokens=2000)
-    return _extract_json(raw)
+    try:
+        return _extract_json(raw)
+    except ValueError:
+        # Graceful fallback: return empty correction so pipeline continues
+        print(f"[WARN] Correction agent returned non-JSON. Skipping correction.\nRaw: {raw[:300]}")
+        return {"corrected_rails": []}
 
 
