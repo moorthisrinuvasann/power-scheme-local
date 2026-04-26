@@ -46,11 +46,10 @@ def parse_requirements(text: str) -> dict:
 def validate_requirements(text: str) -> str | None:
     """Returns an error string if requirements are invalid, else None."""
     if not text or len(text.strip()) < 10:
-        return "Requirements text is too short. Please describe your voltage/current needs."
-    if not re.search(r'\d+\.?\d*\s*[Vv]', text):
-        return "No voltage specification found (e.g. '3.3V', '1.8V'). Please include target voltages."
-    if not re.search(r'\d+\.?\d*\s*[Aa]', text):
-        return "No current specification found (e.g. '2A', '500mA'). Please include load currents."
+        return "Requirements text is too short. Please describe your power supply needs."
+    # Just check there's at least one number in the text — the LLM handles the rest
+    if not re.search(r'\d', text):
+        return "No numeric values found in requirements. Please include voltages and currents (e.g. 3.3V, 2A)."
     return None
 
 # ── SSE helper ────────────────────────────────────────────────────────────────
