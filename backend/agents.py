@@ -24,7 +24,7 @@ HEADERS = {
 SYS_JSON = "You output strictly valid JSON only. No markdown fences, no comments, no trailing commas."
 
 
-async def _llm(client, prompt: str) -> str:
+async def _llm(client, prompt: str, max_tokens: int = 4000) -> str:
     """Single LLM call with 180s timeout, returns raw text."""
     try:
         resp = await asyncio.wait_for(
@@ -34,6 +34,7 @@ async def _llm(client, prompt: str) -> str:
                     {"role": "system", "content": SYS_JSON},
                     {"role": "user",   "content": prompt},
                 ],
+                max_tokens=max_tokens,
                 extra_headers=HEADERS,
             ),
             timeout=180.0,
@@ -262,37 +263,45 @@ async def agent_correction(requirements: str, components: list,
     Returns updated_rail_assignments (only the corrected ones).
     """
     issues = failures + drc_violations
-    issues_json   = json.dumps(issues, indent=2)
-    original_json = json.dumps(original_assignments, indent=2)
-    comp_summary  = json.dumps([
+    issues_json = json.dumps(issues, indent=2)
+
+    # Only send the FAILED rails (not all assignments) to reduce input tokens
+    failed_rail_names = set(i.get("rail", "") for i in issues)
+    failed_assignments = [r for r in original_assignments if r.get("rail") in failed_rail_names]
+    if not failed_assignments:
+        failed_assignments = original_assignments[:3]  # fallback: send first 3
+    original_json = json.dumps(failed_assignments, indent=2)
+
+    # Detect types needed and filter components to only relevant category
+    needs_buck = any(r.get("comp_type","buck").lower()=="buck" for r in failed_assignments)
+    needs_ldo  = any(r.get("comp_type","").lower()=="ldo"  for r in failed_assignments)
+    filtered = [c for c in components if
+        (needs_buck and c.get("category","").lower()=="buck") or
+        (needs_ldo  and c.get("category","").lower()=="ldo")]
+    if not filtered:
+        filtered = components[:20]
+
+    comp_summary = json.dumps([
         {"part_name": c["part_name"], "category": c["category"],
-         "price": c["price"], "summary": c["summary"]}
-        for c in components
+         "price": c["price"], "summary": c.get("summary","")[:80]}
+        for c in filtered[:25]   # hard cap at 25 components
     ], indent=2)
 
-    prompt = f"""
-You are a power electronics remediation expert.
+    prompt = f"""You are a power electronics remediation expert.
 
-ORIGINAL REQUIREMENTS:
-{requirements}
+REQUIREMENTS (brief): {requirements[:300]}
 
-CURRENT DESIGN (rail assignments):
+FAILED RAILS ONLY:
 {original_json}
 
-FAILURES & DRC VIOLATIONS DETECTED:
+FAILURES & DRC VIOLATIONS:
 {issues_json}
 
-AVAILABLE REPLACEMENT COMPONENTS:
+AVAILABLE REPLACEMENTS (relevant category only):
 {comp_summary}
 
-TASK:
-For ONLY the rails listed in the failures/violations above, select better replacement components:
-- Thermal Fail → Select Buck/LDO with lower Rtheta_ja or higher efficiency
-- Ripple Fail  → Select component with higher switching frequency or larger output capacitance
-- PSRR Fail    → Select LDO with higher PSRR rating
-- Current Derating Error → Select component with higher I_max
-- LDO Dropout Error → Select LDO with lower Vdo
-- Keep ALL other rails unchanged from original design
+Fix ONLY the failed rails above. For each failed rail pick a better component.
+Rules: Thermal Fail→lower Rthja, Ripple Fail→higher freq/cap, PSRR Fail→higher PSRR, Derating→higher I_max, LDO Dropout→lower Vdo.
 
 Return ONLY valid JSON:
 {{
@@ -305,13 +314,12 @@ Return ONLY valid JSON:
       "component": "LTM4655",
       "comp_type": "buck",
       "upstream_component": "",
-      "change_reason": "Replaced LTM4638 with LTM4655 — lower Rthja=6.5C/W improves thermal margin"
+      "change_reason": "Replaced due to thermal fail — LTM4655 has lower Rthja"
     }}
   ]
-}}
-"""
+}}"""
     client = _make_client(api_key)
-    raw = await _llm(client, prompt)
+    raw = await _llm(client, prompt, max_tokens=2000)
     return _extract_json(raw)
 
 
