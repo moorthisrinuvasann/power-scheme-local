@@ -1,293 +1,312 @@
-# ⚡ AI Power Scheme Generator
+# ⚡ AI Power Scheme Generator — v2.0
 
-An intelligent full-stack web application that automatically generates professional power scheme designs for electronic systems using LLM-based analysis via the OpenRouter API. The system selects optimal Buck Converters and LDO regulators from a local component database, performs per-rail engineering calculations, and exports a detailed HTML engineering report.
+A **multi-agent AI pipeline** that automates power supply design for embedded and industrial systems. Provide your voltage/current requirements and get three complete, professionally evaluated power schemes with schematics, BOM, engineering analysis, DRC validation, and a downloadable HTML report.
 
 ---
 
-## 📸 Features
+## 🚀 Key Features
 
-- **3-Agent AI Pipeline**: Three specialized LLM agents each handle a narrow focused task (see architecture below)
-- **Live Progress Streaming**: Real-time Server-Sent Events show each agent step as it completes
-- **Per-Rail Engineering Analysis**: Ripple voltage, PSRR, and thermal calculations for **every individual output rail** using real Python math
-- **Interactive Schematics**: Auto-rendered Mermaid.js block diagrams showing the power distribution tree
-- **Component Selection**: Picks optimal Buck Converters and LDOs from a local SQLite datasheet database with 1.5–1.75× current derating
-- **Professional HTML Report**: Downloadable engineering report with Mermaid diagrams, calculation tables, and executive summary
-- **Dual Input Mode**: Paste requirements directly in the textarea or upload a `.txt`/`.csv`/`.json` file
-- **Thermal Validation**: Junction temperature estimates using `Tj = Ta + (Pdiss × Rθja)` from datasheet values
+| Feature | Description |
+|---|---|
+| **3-Agent Pipeline** | Specialized LLM agents for component selection, topology design, and schematic generation |
+| **Python Engineering Engine** | Exact ripple, PSRR, thermal, and current derating calculations — no LLM estimates |
+| **Design Rule Checker (DRC)** | Validates dropout voltage, current derating, input voltage range, output validity |
+| **Correction Agent** | Auto-replaces failed components and re-runs calculations in a closed feedback loop |
+| **Scheme Comparison Table** | Side-by-side comparison: price, PCB area, BOM, Tj min/max, efficiency, DRC status |
+| **Live Progress Stream** | Real-time 6-step SSE progress bar with agent status chips |
+| **HTML Report Download** | Full professional report with comparison, DRC, corrections, schematics, and analysis |
 
-## 🏗️ Agent Architecture
+---
+
+## 🏗️ Architecture
+
+### Agent Pipeline (6 Steps)
 
 ```
 User Requirements
-      │
-      ▼
-┌─────────────────────────────────────────────────────────┐
-│  AGENT 1: Component Selector  🔍                        │
-│  - Queries SQLite component database                    │
-│  - Applies 1.5–1.75× current derating                  │
-│  - Proposes 3 different scheme options                  │
-│  - Accounts for indirect LDO load currents             │
-└───────────────────────┬─────────────────────────────────┘
-                        │ component_selections per scheme
-                        ▼
-┌─────────────────────────────────────────────────────────┐
-│  AGENT 2: Topology Designer  🏗️                         │
-│  - Designs power distribution tree                      │
-│  - Assigns v_in for each rail                           │
-│  - Identifies upstream Buck for each LDO               │
-│  - Selects dropout-aware LDO input sources             │
-└───────────────────────┬─────────────────────────────────┘
-                        │ rail_assignments with full topology
-                        ▼
-┌─────────────────────────────────────────────────────────┐
-│  AGENT 3: Schematic Generator  📐                       │
-│  - Generates Mermaid diagram code only                  │
-│  - Uses exact IC part numbers as node labels            │
-│  - Shows voltage/current on edges                       │
-└───────────────────────┬─────────────────────────────────┘
-                        │ mermaid_code per scheme
-                        ▼
-┌─────────────────────────────────────────────────────────┐
-│  PYTHON CALCULATOR  🧮  (no LLM — real math)           │
-│  Buck Ripple: ΔV = ΔIL / (8 × f × C)                  │
-│  LDO Ripple:  V_out = V_in_rip / 10^(PSRR/20)         │
-│  Thermal:     Tj = Ta + Pdiss × Rθja                   │
-└───────────────────────┬─────────────────────────────────┘
-                        │ accurate rail_analysis per rail
-                        ▼
-              Final JSON Response
-     (streamed live via Server-Sent Events)
+       │
+       ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  Step 1 — 🔍 Agent 1: Component Selector                       │
+│  • Queries SQLite DB (Buck + LDO components)                   │
+│  • Filters by category (Buck/LDO) before sending to LLM        │
+│  • Applies 1.5–1.75× current derating rule                     │
+│  • Produces 3 scheme options with varied topology              │
+└────────────────────────────┬────────────────────────────────────┘
+                             │
+                             ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  Step 2 — 🏗️ Agent 2: Topology Designer                        │
+│  • Assigns V_in for every rail                                  │
+│  • Routes LDOs to upstream Buck output rails                   │
+│  • Assigns switching frequencies from datasheets               │
+│  • Generates executive summary comparing all 3 schemes         │
+└────────────────────────────┬────────────────────────────────────┘
+                             │
+                             ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  Step 3 — 📐 Agent 3: Schematic Generator                      │
+│  • Generates valid Mermaid flow diagrams (graph TD)            │
+│  • One complete schematic per scheme                           │
+└────────────────────────────┬────────────────────────────────────┘
+                             │
+                             ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  Step 4 — 🧮 Python Engineering Calculator                     │
+│  Per rail, per scheme:                                         │
+│  • Ripple: ΔV = ΔIL / (8 × f × C)                            │
+│  • PSRR: Attenuation = 10^(PSRR_dB/20), V_out = V_in/Atten   │
+│  • Thermal: Tj = Ta + (Pdiss × Rθja)                          │
+│  • Derating: Factor = I_max / I_load (Pass ≥1.5×, Warn ≥1.2×)│
+└────────────────────────────┬────────────────────────────────────┘
+                             │
+                             ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  Step 5 — 🔬 Design Rule Checker (DRC)                         │
+│  • Current derating < 1.5×  → ERROR                           │
+│  • LDO dropout violation    → ERROR                           │
+│  • LDO dropout marginal     → WARNING                         │
+│  • Buck Vin out of range    → ERROR                           │
+│  • Vout ≥ Vin               → ERROR                           │
+│  ─────────────────────────────────────────────────────────     │
+│  If failures found → Agent 1b: Correction Agent fires          │
+│  • Replaces only failed rails with better components           │
+│  • Re-runs Calculator + DRC to confirm fixes                   │
+└────────────────────────────┬────────────────────────────────────┘
+                             │
+                             ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  Step 6 — ✅ Scheme Comparator                                  │
+│  Per-scheme metrics: price, BOM count, PCB area estimate,      │
+│  Tj min/max, avg efficiency, DRC status, corrections applied   │
+└────────────────────────────┬────────────────────────────────────┘
+                             │
+                             ▼
+                    Final Result (SSE event)
 ```
 
 ---
 
-## 🗂️ Project Structure
+## 📁 Project Structure
 
 ```
 openrouter-ai/
-│
 ├── backend/
-│   ├── main.py              # FastAPI server — LLM prompt engine, API routes, JSON parsing
-│   └── ingest.py            # PDF datasheet ingestion → SQLite database builder
-│
+│   ├── main.py          # FastAPI app, SSE pipeline, /api/generate, /api/export
+│   ├── agents.py        # Agent 1, 1b, 2, 3 — LLM orchestration via OpenRouter
+│   ├── calculator.py    # Python ripple / PSRR / thermal / derating engine
+│   ├── drc.py           # Design Rule Checker — 5 hard engineering rules
+│   ├── comparator.py    # Scheme comparison metrics (PCB area, BOM, Tj, efficiency)
+│   └── components.db    # SQLite database of Buck + LDO components
 ├── frontend/
-│   ├── index.html           # Main UI — textarea input, upload zone, results layout
-│   ├── app.js               # Core JS — generate flow, rail analysis renderer, HTML report exporter
-│   └── style.css            # Dark-theme UI with glassmorphism, animations, responsive grid
-│
-├── datasheets/
-│   ├── BuckConverter/       # PDF datasheets for all supported Buck Converters
-│   │   ├── ltm4622.pdf
-│   │   ├── ltm4630.pdf
-│   │   ├── ltm4630a.pdf
-│   │   ├── ltm4638.pdf
-│   │   ├── ltm4650-1.pdf
-│   │   ├── ltm4655.pdf
-│   │   ├── ltm4671.pdf
-│   │   ├── ltm4675.pdf
-│   │   ├── ltm4676a.pdf
-│   │   ├── ltm4680.pdf
-│   │   ├── ltm4700.pdf
-│   │   ├── ltm4705.pdf
-│   │   ├── ltm8067fc.pdf
-│   │   └── tpsm82866a.pdf
-│   │
-│   └── LDO/                 # PDF datasheets for all supported LDO Regulators
-│       ├── 3070fc.pdf
-│       ├── adp1763.pdf
-│       ├── adp7159.pdf
-│       ├── tps737.pdf
-│       └── tps7a85a.pdf
-│
-├── requirement/
-│   └── requirement1.txt     # Sample power requirement input file
-│
-├── html/
-│   └── Power-Scheme-Report.html  # Sample exported engineering report
-│
-├── read_excel.py            # Utility: reads price/bug data from Excel into the database
-├── ltm4638_info.txt         # Extracted datasheet text for LTM4638 (reference)
-├── .gitignore               # Ignores __pycache__, .db files, venv, etc.
-└── README.md                # This file
+│   ├── index.html       # Single-page app shell
+│   ├── style.css        # Dark UI theme with glassmorphism
+│   └── app.js           # SSE stream reader, renderers, report builder
+└── README.md
 ```
 
 ---
 
-## ⚙️ Technology Stack
+## 🔌 Backend Modules
 
-| Layer | Technology |
+### `backend/agents.py` — LLM Agents
+
+| Agent | Task | Input | Output |
+|---|---|---|---|
+| **Agent 1** | Component Selector | Requirements + component DB | 3 schemes with component selections |
+| **Agent 2** | Topology Designer | Schemes from Agent 1 | Rail assignments with V_in, upstream, freq |
+| **Agent 3** | Schematic Generator | Rail assignments | 3 Mermaid diagram strings |
+| **Agent 1b** | Correction Agent | Failed rails + violations | Replacement component selections |
+
+All agents use `openrouter/auto` model via the OpenAI-compatible OpenRouter API.
+
+---
+
+### `backend/calculator.py` — Engineering Engine
+
+Replaces LLM estimates with exact datasheet-derived Python math:
+
+```python
+# Voltage Ripple (Buck)
+dIL    = (V_in - V_out) * D / (f_sw * L)
+dV_mV  = (dIL / (8 * f_sw * C)) * 1000
+
+# PSRR Attenuation (LDO)
+atten     = 10 ** (PSRR_dB / 20)
+V_out_rip = V_in_rip / atten
+
+# Junction Temperature
+P_diss = (V_in - V_out) * I_out        # LDO
+P_diss = (1 - eta) * V_out * I_out     # Buck
+Tj     = Ta + P_diss * Rθja
+
+# Current Derating
+factor = I_max / I_load   # Pass ≥1.5×, Warn ≥1.2×, Fail <1.2×
+```
+
+Supports all Analog Devices LTM µModules and TI power devices.
+
+---
+
+### `backend/drc.py` — Design Rule Checker
+
+Validates every rail assignment against hard engineering constraints:
+
+| Rule | Condition | Severity |
+|---|---|---|
+| Current Derating | derating < 1.5× | ERROR |
+| LDO Dropout Violation | V_in − V_out < V_dropout | ERROR |
+| LDO Dropout Marginal | headroom < V_dropout × 1.2 | WARNING |
+| Buck Vin Too Low | V_in < V_in_min (datasheet) | ERROR |
+| Buck Vin Too High | V_in > V_in_max (datasheet) | ERROR |
+| Output Voltage Invalid | V_out ≥ V_in | ERROR |
+
+If **any** ERROR or WARNING is found, **Agent 1b (Correction Agent)** fires automatically, selects replacement components, and re-validates.
+
+---
+
+### `backend/comparator.py` — Scheme Comparator
+
+Computes per-scheme metrics for the comparison table:
+
+| Metric | Source |
 |---|---|
-| **Backend** | Python 3.10+, FastAPI, Uvicorn |
-| **LLM API** | OpenRouter (`openrouter/free` model routing) |
-| **LLM Client** | `openai` Python SDK (OpenAI-compatible) |
-| **Database** | SQLite (component datasheet store) |
-| **PDF Ingestion** | PyMuPDF (`fitz`) |
-| **Frontend** | Vanilla HTML5, CSS3, JavaScript (ES6) |
-| **Diagrams** | Mermaid.js (CDN) |
-| **Styling** | Custom dark-theme CSS with glassmorphism |
+| Total Price (INR) | Agent 1 component prices |
+| Buck / LDO count | Rail assignments |
+| PCB Area (mm²) | Datasheet package footprints × 1.4 routing margin |
+| Output capacitors | C_out spec / 22µF per cap |
+| Resistors | 2× feedback divider per rail + bootstrap |
+| Tj Min / Tj Max | Calculator thermal results |
+| Avg Efficiency | Datasheet η per buck rail |
+| DRC errors/warnings | DRC module output |
 
 ---
 
-## 🚀 Getting Started
+## 🖥️ Frontend (`frontend/app.js`)
 
-### 1. Prerequisites
+### SSE Stream Parser
+Reads `text/event-stream` from `/api/generate` using proper **event-boundary parsing** (`\n\n` split), ensuring large JSON payloads are never dropped mid-stream.
 
-```bash
-pip install fastapi uvicorn openai pymupdf openpyxl
-```
+### UI Sections (after generation)
+1. **⚖️ Scheme Comparison Table** — side-by-side with ★ best-in-class highlighting
+2. **Per Scheme:**
+   - DRC Violations table (severity, rail, rule, detail, suggested fix)
+   - Auto-Corrections log (which rail replaced and why)
+   - Mermaid schematic diagram
+   - Selected Components list with price and reasoning
+   - Engineering Analysis per rail (Ripple, PSRR, Thermal, Derating)
 
-### 2. Build the Component Database
+### HTML Report Download
+The **Download HTML Report** button POSTs the full report HTML to `/api/export` which returns it with `Content-Disposition: attachment` headers for reliable cross-browser download.
 
-Ingest all PDF datasheets into SQLite:
-
-```bash
-python backend/ingest.py
-```
-
-Optionally load pricing and bug data from Excel:
-
-```bash
-python read_excel.py
-```
-
-### 3. Start the Backend Server
-
-```bash
-python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
-```
-
-### 4. Open the Application
-
-Navigate to **http://localhost:8000** in your browser.
+Report sections:
+- Executive Summary
+- Scheme Comparison Matrix (all metrics, ★ best values)
+- Per scheme: DRC + Corrections → Schematics → Components → Engineering Table
 
 ---
 
-## 📋 How to Use
+## ⚙️ Setup & Run
 
-1. **Enter API Key** — Paste your [OpenRouter API key](https://openrouter.ai/keys) (`sk-or-v1-...`)
-2. **Enter Requirements** — Type or paste your power requirements in the text area, e.g.:
-   ```
-   Input Voltage : 12 V
-   Output Voltages(V) : V1 = 3.3, V2 = 5, V3 = 0.85, V4 = 1.8
-   Output Currents (A) : A1 = 6, A2 = 3.5, A3 = 0.5, A4 = 1.0
-   Efficiency(%) : 90
-   Ambient Temperature(degCel): 85
-   PSRR : >35dB
-   Ripple: <15mV
-   ```
-3. **Upload File (optional)** — Upload a `.txt` file instead; content auto-populates the textarea
-4. **Generate** — Click **"Generate Power Scheme"** and wait ~30–60 seconds
-5. **Review** — Browse 3 scheme options with schematics, components, and per-rail analysis
-6. **Export** — Click **"Download HTML Report"** for a professional offline report
+### Prerequisites
+- Python 3.10+
+- OpenRouter API key → [openrouter.ai/keys](https://openrouter.ai/keys)
+
+### Install
+```bash
+cd openrouter-ai
+pip install fastapi uvicorn openai python-multipart
+```
+
+### Run
+```bash
+python -m uvicorn backend.main:app --host 0.0.0.0 --port 8001 --reload
+```
+
+Open **http://localhost:8001**
+
+### Usage
+1. Enter your **OpenRouter API key**
+2. Describe power requirements (e.g. `"12V input, need 3.3V@6A, 1.8V@2A, 1.0V@4A, 0.9V@1A, ambient 85°C"`)
+3. Click **Generate Power Scheme**
+4. Watch the 6-step live progress
+5. Review comparison table, DRC results, schematics, and engineering analysis
+6. Click **Download HTML Report** for the offline-ready report
 
 ---
 
-## 📐 Engineering Analysis — Per Rail
+## 🗄️ Component Database (`components.db`)
 
-For each output voltage rail, the system calculates and displays:
+SQLite database with two tables:
 
-| Analysis | Formula Used |
+### `components`
+| Column | Description |
 |---|---|
-| **Voltage Ripple** | `V_rip = I_out / (8 × f_sw × C_out)` |
-| **PSRR** | From component datasheet at the operating frequency |
-| **Thermal (Junction Temp)** | `Tj = Ta + (Pdiss × Rθja)` |
+| `part_name` | IC part number (e.g. `LTM4638`) |
+| `category` | `Buck Converter` or `LDO` |
+| `price` | Unit price (INR) |
+| `summary` | Datasheet key specs summary |
 
-All three are evaluated for **Pass / Fail** against the input requirements.
+### Supported Components
 
----
+**Buck Converters (Analog Devices LTM µModules + TI):**
+LTM4638, LTM4622, LTM4622IV, LTM4630, LTM4630A, LTM4650, LTM4650-1, LTM4655, LTM4671, LTM4675, LTM4676A, LTM4680, LTM4700, LTM4705, TPSM82866A, LTM8067FC
 
-## 🧩 Supported Components
-
-### Buck Converters
-| Part | Key Spec |
-|---|---|
-| LTM4622 | Dual 4A, 4V–20V input |
-| LTM4630 / LTM4630A | Dual 15A, high efficiency |
-| LTM4638 | Single 10A, 3.4V–20V |
-| LTM4650-1 | Single 25A |
-| LTM4655 | Single 15A, automotive |
-| LTM4671 | Quad 4A |
-| LTM4675 | Dual 13A |
-| LTM4676A | Dual 13A with PMBus |
-| LTM4680 | Dual 10A with PMBus |
-| LTM4700 | Dual 50A |
-| LTM4705 | Single 40A |
-| LTM8067FC | Isolated |
-| TPSM82866A | 6A, small form factor |
-
-### LDO Regulators
-| Part | Key Spec |
-|---|---|
-| LT3070 | 4A, ultra-low noise |
-| ADP1763 | 1A, low dropout |
-| ADP7159 | 500mA, high PSRR |
-| TPS737 | 1A, low quiescent |
-| TPS7A85A | 4A, high PSRR |
+**LDO Regulators:**
+LT3070, ADP1763, ADP7159, TPS737, TPS73701DCQ, TPS7A85A
 
 ---
 
-## 🔒 Design Constraints Applied by AI
+## 🔧 API Reference
 
-1. Buck converters are **single-output only** — one device per voltage rail
-2. LDOs are sourced from **buck converter output rails**, not directly from input
-3. **1.5–1.75× current derating** applied to all component selections
-4. LDO input selected for **minimum dropout voltage**
-5. Thermal check: junction temperature must not exceed component max rating
-6. Splitting to multiple converters if thermal budget fails
+### `POST /api/generate`
+Accepts multipart form with:
+- `file`: `.txt` requirements file
+- `api_key`: OpenRouter API key
 
----
+Returns: `text/event-stream` SSE with events:
+- `event: progress` → `{"step": N, "total": 6, "message": "..."}`
+- `event: result` → full JSON payload with schemes, comparison, DRC
+- `event: error` → `{"message": "..."}`
 
-## 📦 Version History
-
-### v1.4.0 — 2026-04-24 *(Phase 2: Multi-Agent Pipeline)*
-- ✅ **Agent 1 — Component Selector**: Dedicated LLM call focused solely on selecting the optimal Buck/LDO for each rail. Applies 1.5–1.75× derating, accounts for indirect load currents, and proposes 3 scheme variants
-- ✅ **Agent 2 — Topology Designer**: Separate LLM call that designs the full power distribution tree — assigns `v_in` per rail, identifies upstream Buck for each LDO, selects dropout-aware LDO input rails
-- ✅ **Agent 3 — Schematic Generator**: Focused single-task LLM call generating only Mermaid diagrams with exact IC part numbers and voltage/current edge labels
-- ✅ **Live SSE Progress Streaming**: Backend streams Server-Sent Events to the browser — users see each agent step in real time with a progress bar and step chips (🔍 → 🏗️ → 📐 → 🧮)
-- ✅ **Python Calculator Integration**: Real engineering math (ripple, PSRR, thermal) injected after LLM topology decisions — no LLM estimation
-- ✅ **Progress Panel Reset**: Agent step chips clear automatically on each new generation
-
-### v1.3.0 — 2026-04-24
-- ✅ **Per-Rail Engineering Analysis**: Ripple, PSRR, and Thermal calculated individually for every voltage rail
-- ✅ **Professional HTML Report Export**: Light-theme report built from raw LLM data (not DOM scraping) with colour-coded rail tables
-- ✅ **Robust JSON Parsing**: Backend now extracts JSON by finding first/last `{}` braces, handles messy LLM responses
-- ✅ **Mermaid CDN in exports**: Downloaded reports render diagrams automatically in browser
-- ✅ **GitHub integration**: Project version-controlled and pushed to remote repository
-
-### v1.2.0 — 2026-04-23
-- ✅ **Textarea Input**: Added direct requirements input — no file upload required
-- ✅ **Generate Button Fixed**: Rewrote event listener using `onclick` instead of `addEventListener` to resolve silent failures
-- ✅ **File Upload Populates Textarea**: Selecting a file auto-fills the requirements box
-- ✅ **Switching Frequency Display**: Added per-scheme switching frequency label in UI
-- ✅ **Download Button Fixed**: HTML report downloads correctly using `Blob` + `URL.createObjectURL`
-
-### v1.1.0 — 2026-04-18
-- ✅ **No-Cache Headers**: Backend serves all static files with `Cache-Control: no-store` to prevent stale JS/HTML
-- ✅ **Label-Based File Upload**: Replaced broken JS click handler with native `<label for="fileInput">` architecture
-- ✅ **File Status Indicator**: Green ✓ feedback shown immediately after file selection
-- ✅ **Mermaid Diagram Fix**: Exported HTML includes raw Mermaid code + CDN script for dynamic rendering
-- ✅ **Document-Level Event Delegation**: File input `change` listener attached to `document` for reliability
-
-### v1.0.0 — 2026-04-17
-- 🎉 **Initial Release**
-- ✅ FastAPI backend with OpenRouter LLM integration
-- ✅ SQLite component database from PDF datasheets
-- ✅ Three-scheme comparative output (Buck + LDO combinations)
-- ✅ Mermaid.js schematics rendering in browser
-- ✅ Combined specifications and thermal analysis tables
-- ✅ Dark-theme glassmorphism UI
-- ✅ PDF datasheet ingestion pipeline
+### `POST /api/export`
+Accepts raw HTML body, returns `Content-Disposition: attachment` response for download.
 
 ---
 
-## 📝 License
+## 📊 Engineering Analysis — Per Rail
 
-This project is intended for internal engineering use. All datasheet PDFs remain the property of their respective manufacturers (Analog Devices / Texas Instruments).
+Each rail shows 4 rows:
+
+| Analysis | Colour | What it shows |
+|---|---|---|
+| 🔵 Voltage Ripple | Blue | ΔV in mV at output caps |
+| 🟣 PSRR | Purple | Noise attenuation in dB |
+| 🩷 Thermal (Tj) | Pink | Junction temp in °C |
+| 🟠 Current Derating | Orange | I_max/I_load ratio with 1.5× threshold |
+
+Status badges: **Pass** (green) · **Warn** (amber) · **Fail** (red)
 
 ---
 
-## 👤 Author
+## 🔄 Phase Roadmap
 
-**Moorthi Srinuvasan**  
-📧 moorthisrinuvasan95@gmail.com  
-🔗 [github.com/moorthisrinuvasann](https://github.com/moorthisrinuvasann)
+| Phase | Status | Description |
+|---|---|---|
+| Phase 1 | ✅ Done | Single LLM call, basic HTML output |
+| Phase 2 | ✅ Done | 3-agent pipeline, SSE streaming, Python calculator |
+| Phase 3 | ✅ Done | DRC validator, correction agent, comparison table, derating |
+| Phase 4 | 🔲 Planned | Follow-up chat for manual component override |
+| Phase 5 | 🔲 Planned | Expanded component DB (TI, Renesas, Infineon) |
+
+---
+
+## 🔒 Security
+
+- API keys are entered at runtime — never stored or committed
+- `.env`, `*.db`, `__pycache__` are in `.gitignore`
+- All LLM calls route through OpenRouter (no direct vendor API keys needed)
+
+---
+
+*Generated by AI Power Scheme Engineering System — Powered by OpenRouter*
