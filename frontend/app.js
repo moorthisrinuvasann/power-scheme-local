@@ -360,6 +360,86 @@ function buildDrcPanel(scheme) {
     return html;
 }
 
+// ── Mermaid Sanitizer ─────────────────────────────────────────────────────────
+function sanitizeMermaid(code) {
+    if (!code) return 'graph TD\n    VIN["Input"] -->|"12V"| OUT["Output"]';
+
+    // Ensure starts with graph TD
+    var lines = code.split('\n').map(function(l) { return l.trim(); }).filter(Boolean);
+    if (!lines[0] || !lines[0].match(/^graph\s+(TD|LR|BT|RL)/i)) {
+        lines.unshift('graph TD');
+    }
+
+    var cleaned = lines.map(function(line, idx) {
+        if (idx === 0) return line; // keep graph TD as-is
+
+        // Remove trailing semicolons
+        line = line.replace(/;+$/, '');
+
+        // Fix node IDs — replace hyphens/spaces/dots in IDs with nothing
+        // Pattern: ID[...] or ID(...)  — fix the ID part only
+        line = line.replace(/([A-Za-z])[\-\.\s]+([A-Za-z0-9])/g, '$1$2');
+
+        // Wrap bare node labels containing special chars in quotes
+        // e.g.  A[LTM4638 Buck] -> A["LTM4638 Buck"]
+        line = line.replace(/(\w+)\[([^\]"]+)\]/g, function(match, id, label) {
+            // already has quotes?
+            if (label.startsWith('"') || label.startsWith("'")) return match;
+            // contains special chars that break Mermaid?
+            if (/[()@#%&]/.test(label)) {
+                label = label.replace(/[()@#%&]/g, '');
+            }
+            return id + '["' + label + '"]';
+        });
+
+        // Ensure edge labels are quoted if they contain spaces or slashes
+        line = line.replace(/\-\->(\s*)\|([^|"]+)\|/g, function(match, sp, lbl) {
+            if (lbl.startsWith('"')) return match;
+            return '-->' + sp + '|"' + lbl.trim() + '"|';
+        });
+
+        return '    ' + line;
+    });
+
+    return cleaned.join('\n');
+}
+
+// ── Fallback diagram built from rail_assignments data ─────────────────────────
+function buildFallbackMermaid(railAssignments) {
+    var lines = ['graph TD'];
+    lines.push('    VIN["VIN Input"]');
+
+    var nodeMap = {};
+    var nodeIdx = 0;
+
+    (railAssignments || []).forEach(function(ra) {
+        var comp  = (ra.component || 'IC').replace(/[^A-Za-z0-9]/g, '');
+        var rail  = (ra.rail  || 'Rail').replace(/[^A-Za-z0-9\s\.]/g, '').trim();
+        var vout  = ra.v_out  || '?';
+        var iout  = ra.i_out  || '?';
+        var ctype = (ra.comp_type || ra.component_type || '').toLowerCase();
+
+        var nodeId = 'N' + (nodeIdx++);
+        nodeMap[ra.rail] = nodeId;
+
+        var label = comp + '\\n' + vout + 'V/' + iout + 'A';
+        var upstream = ra.upstream_component || '';
+        var src = 'VIN';
+        // If LDO with upstream, find its node
+        if (ctype === 'ldo' && upstream) {
+            for (var k in nodeMap) {
+                if (k && k.indexOf(upstream) !== -1) { src = nodeMap[k]; break; }
+            }
+        }
+        lines.push('    ' + src + ' -->|"' + vout + 'V ' + iout + 'A"| ' + nodeId + '["' + label + '"]');
+    });
+
+    if (lines.length === 2) {
+        lines.push('    VIN -->|"12V"| OUT["Output Rails"]');
+    }
+    return lines.join('\n');
+}
+
 // ── Render results in the browser ─────────────────────────────────────────────
 async function renderResults(data) {
     rawMermaidCodes = [];
@@ -377,18 +457,27 @@ async function renderResults(data) {
     for (var i = 0; i < data.schemes.length; i++) {
         var s = data.schemes[i];
 
-        // Clean mermaid code
-        var mCode = (s.schematics_mermaid || '').trim()
-            .replace(/^```mermaid/, '').replace(/^```/, '').replace(/```$/, '').trim();
+        // ── Sanitize + render Mermaid ────────────────────────────────────────
+        var rawCode = (s.schematics_mermaid || '').trim()
+            .replace(/^```mermaid\s*/i, '').replace(/^```\s*/,'').replace(/\s*```$/,'').trim();
+
+        var mCode = sanitizeMermaid(rawCode);
         rawMermaidCodes[i] = mCode;
 
-        // Render mermaid diagram
         var svgOut = '';
         try {
             var rendered = await mermaid.render('mermaid-svg-' + i, mCode);
             svgOut = rendered.svg;
         } catch(err) {
-            svgOut = '<pre style="text-align:left;font-size:0.8rem;color:#aaa;overflow-x:auto;white-space:pre-wrap;">' + mCode + '</pre>';
+            // One retry with a minimal safe fallback built from rail_assignments
+            try {
+                var fallback = buildFallbackMermaid(s.rail_assignments || []);
+                var rendered2 = await mermaid.render('mermaid-svg-fb-' + i, fallback);
+                svgOut = rendered2.svg
+                    + '<p style="font-size:0.75rem;color:#f59e0b;margin-top:0.5rem;">⚠️ LLM diagram had syntax errors — showing auto-generated schematic.</p>';
+            } catch(err2) {
+                svgOut = '<pre style="text-align:left;font-size:0.78rem;color:#94a3b8;overflow-x:auto;white-space:pre-wrap;padding:0.5rem;background:rgba(0,0,0,0.3);border-radius:8px;">' + mCode + '</pre>';
+            }
         }
 
         var block = '<div class="scheme-block" style="margin-bottom:3rem;border:2px solid var(--primary);padding:2rem;border-radius:16px;background:rgba(30,41,59,0.4);">'

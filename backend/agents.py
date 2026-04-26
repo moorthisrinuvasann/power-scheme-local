@@ -201,26 +201,36 @@ async def agent_schematic_generator(schemes: list, api_key: str) -> list:
     ], indent=2)
 
     prompt = f"""
-You are a power electronics schematic expert specializing in Mermaid diagrams.
+You are a Mermaid diagram expert for power electronics.
 
-Generate Mermaid flow diagrams for these power schemes:
+Generate one Mermaid flowchart per power scheme for these designs:
 {schemes_summary}
 
-DIAGRAM RULES:
-1. Use exact IC part numbers as node labels, e.g.: A[LTM4638]
-2. Show voltage levels on edges, e.g.: -->|3.3V 6A|
-3. Start from Vin input node, flow through Bucks, then to LDOs, then to load labels.
-4. Use "graph TD" (top-down) layout.
-5. Use short unique node IDs (A, B, C, D...).
-6. Escape special characters — no parentheses in node labels.
-7. Each scheme must be a separate, complete, valid Mermaid string.
+STRICT MERMAID SYNTAX RULES — violating any of these causes a blank diagram:
+1. ALWAYS start with exactly: graph TD
+2. Node IDs: ONLY letters and numbers, NO spaces, NO hyphens, NO underscores (use VIN, BUCK1, LDO1, RAIL1, etc.)
+3. Node labels: ALWAYS wrap in square brackets with quotes if special chars exist: A["LTM4638\\n10A Buck"]
+4. Edge labels: Use ---->|label| format, label must NOT contain parentheses
+5. NO semicolons at end of lines
+6. NO subgraph blocks (causes rendering issues)
+7. Every line must be a valid edge definition: NodeA -->|label| NodeB
+8. Use \\n inside quoted labels for multi-line, not actual newlines
 
-Return ONLY valid JSON (no markdown):
+VALID EXAMPLE (use this exact pattern):
+graph TD
+    VIN["12V Input"] -->|"12V"| BUCK1["LTM4638\\nBuck 10A"]
+    VIN -->|"12V"| BUCK2["LTM4630\\nBuck 15A"]
+    BUCK1 -->|"3.3V 6A"| RAIL1["3.3V Rail"]
+    BUCK1 -->|"1.8V 2A"| LDO1["ADP1763\\nLDO 1A"]
+    BUCK2 -->|"1.0V 4A"| RAIL2["1.0V Rail"]
+    LDO1 -->|"1.8V 2A"| RAIL3["1.8V Rail"]
+
+Return ONLY valid JSON (no markdown fences, no comments):
 {{
   "schematics": [
-    "graph TD\\n A[12V Input] --> B[LTM4638]\\n B -->|3.3V 6A| C[3.3V Rail]",
-    "graph TD\\n ...",
-    "graph TD\\n ..."
+    "graph TD\\n    VIN[\\"12V Input\\"] -->|\\"12V\\"| BUCK1[\\"LTM4638\\"]\\n    BUCK1 -->|\\"3.3V 6A\\"| R1[\\"3.3V Rail\\"]",
+    "graph TD\\n    ...",
+    "graph TD\\n    ..."
   ]
 }}
 """
@@ -229,7 +239,7 @@ Return ONLY valid JSON (no markdown):
     data = _extract_json(raw)
     schematics = data.get("schematics", [])
     while len(schematics) < len(schemes):
-        schematics.append("graph TD\n A[Input] --> B[Output]")
+        schematics.append("graph TD\n    VIN[\"12V Input\"] -->|\"12V\"| OUT[\"Output Rail\"]")
     return schematics
 
 
