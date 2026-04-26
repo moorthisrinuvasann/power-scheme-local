@@ -106,7 +106,7 @@ def check_calc_failures(rail_analysis: list) -> list:
     """
     failures = []
     for r in rail_analysis:
-        for atype in ["ripple", "psrr", "thermal"]:
+        for atype in ["ripple", "psrr", "thermal", "derating"]:   # ← derating added
             data = r.get(atype, {})
             if str(data.get("status", "")).lower() == "fail":
                 failures.append({

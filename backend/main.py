@@ -31,7 +31,7 @@ def get_all_components():
     return [{"part_name": r[0], "category": r[1], "price": r[2],
              "bug_details": r[3], "summary": (r[4] or "")[:800]} for r in rows]
 
-# ── Parse requirements ────────────────────────────────────────────────────────
+# ── Parse requirements ────────────────────────────────────────────────
 def parse_requirements(text: str) -> dict:
     req = {"ta": 85, "ripple_mv": 15, "psrr_db": 35}
     m = re.search(r'[Aa]mbient\s*[Tt]emp[^:]*:\s*([\d.]+)', text)
@@ -41,6 +41,17 @@ def parse_requirements(text: str) -> dict:
     m = re.search(r'PSRR[^:]*:\s*>?\s*([\d.]+)\s*d[Bb]', text)
     if m: req["psrr_db"] = float(m.group(1))
     return req
+
+
+def validate_requirements(text: str) -> str | None:
+    """Returns an error string if requirements are invalid, else None."""
+    if not text or len(text.strip()) < 10:
+        return "Requirements text is too short. Please describe your voltage/current needs."
+    if not re.search(r'\d+\.?\d*\s*[Vv]', text):
+        return "No voltage specification found (e.g. '3.3V', '1.8V'). Please include target voltages."
+    if not re.search(r'\d+\.?\d*\s*[Aa]', text):
+        return "No current specification found (e.g. '2A', '500mA'). Please include load currents."
+    return None
 
 # ── SSE helper ────────────────────────────────────────────────────────────────
 def sse_event(event: str, data: dict) -> str:
@@ -60,34 +71,39 @@ async def generate_scheme(file: UploadFile = File(...), api_key: str = Form(...)
     req_params  = parse_requirements(requirements)
     components  = get_all_components()
 
+    # ── Pre-flight validation ──────────────────────────────────────────
+    err = validate_requirements(requirements)
+    if err:
+        raise HTTPException(status_code=422, detail=err)
+
     async def stream():
         try:
             # ── AGENT 1: Component Selection ──────────────────────────────
-            yield sse_event("progress", {"step": 1, "total": 3,
+            yield sse_event("progress", {"step": 1, "total": 6,
                 "message": "Agent 1/3: Selecting optimal components for each rail..."})
 
             agent1 = await agent_component_selector(requirements, components, api_key)
 
-            yield sse_event("progress", {"step": 1, "total": 3,
+            yield sse_event("progress", {"step": 1, "total": 6,
                 "message": f"Agent 1 done. Selected components for {len(agent1.get('schemes', []))} schemes."})
 
-            # ── AGENT 2: Topology Design ──────────────────────────────────
-            yield sse_event("progress", {"step": 2, "total": 3,
+            # ── AGENT 2: Topology Design ───────────────────────────────
+            yield sse_event("progress", {"step": 2, "total": 6,
                 "message": "Agent 2/3: Designing power distribution topology..."})
 
             agent2 = await agent_topology_designer(requirements, agent1, api_key)
 
-            yield sse_event("progress", {"step": 2, "total": 3,
+            yield sse_event("progress", {"step": 2, "total": 6,
                 "message": "Agent 2 done. Power tree topology finalized."})
 
-            # ── AGENT 3: Schematic Generation ─────────────────────────────
-            yield sse_event("progress", {"step": 3, "total": 3,
+            # ── AGENT 3: Schematic Generation ───────────────────────────
+            yield sse_event("progress", {"step": 3, "total": 6,
                 "message": "Agent 3/3: Generating Mermaid schematics..."})
 
             schemes = agent2.get("schemes", [])
             mermaid_codes = await agent_schematic_generator(schemes, api_key)
 
-            yield sse_event("progress", {"step": 3, "total": 3,
+            yield sse_event("progress", {"step": 3, "total": 6,
                 "message": "Agent 3 done. Schematics generated."})
 
             # ── PYTHON CALCULATOR: Real engineering values ─────────────────
@@ -140,13 +156,15 @@ async def generate_scheme(file: UploadFile = File(...), api_key: str = Form(...)
                         )
                         corrected = correction.get("corrected_rails", [])
                         if corrected:
-                            # Merge corrections back (replace by rail name)
-                            rail_map = {r["rail"]: r for r in rail_assignments}
+                            # Fuzzy rail merge: normalize names before matching
+                            def _norm(s): return re.sub(r'[^a-z0-9]', '', s.lower())
+                            rail_map = {_norm(r["rail"]): r for r in rail_assignments}
                             changes  = []
                             for cr in corrected:
-                                if cr["rail"] in rail_map:
+                                key = _norm(cr.get("rail", ""))
+                                if key in rail_map:
                                     changes.append(f"{cr['rail']}: {cr.get('change_reason','replaced')}")
-                                    rail_map[cr["rail"]] = cr
+                                    rail_map[key] = cr
                             scheme["rail_assignments"] = list(rail_map.values())
                             scheme["correction_log"]   = changes
 

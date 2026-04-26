@@ -6,23 +6,23 @@ import math
 
 # ── Datasheet constants for all supported components ─────────────────────────
 COMPONENT_SPECS = {
-    # Buck Converters
-    "LTM4638":   {"type":"buck","f_sw_hz":1e6,  "l_uh":1.5,"c_out_uf":47,  "rth_ja":8.0, "eta":0.91,"i_max":10.0},
-    "LTM4622":   {"type":"buck","f_sw_hz":1.5e6,"l_uh":1.0,"c_out_uf":22,  "rth_ja":10.0,"eta":0.90,"i_max":4.0},
-    "LTM4622IV": {"type":"buck","f_sw_hz":1.5e6,"l_uh":1.0,"c_out_uf":22,  "rth_ja":10.0,"eta":0.90,"i_max":4.0},
-    "LTM4630":   {"type":"buck","f_sw_hz":800e3,"l_uh":1.5,"c_out_uf":100, "rth_ja":5.0, "eta":0.93,"i_max":15.0},
-    "LTM4630A":  {"type":"buck","f_sw_hz":800e3,"l_uh":1.5,"c_out_uf":100, "rth_ja":5.0, "eta":0.93,"i_max":15.0},
-    "LTM4650":   {"type":"buck","f_sw_hz":600e3,"l_uh":1.5,"c_out_uf":220, "rth_ja":4.0, "eta":0.93,"i_max":25.0},
-    "LTM4650-1": {"type":"buck","f_sw_hz":600e3,"l_uh":1.5,"c_out_uf":220, "rth_ja":4.0, "eta":0.93,"i_max":25.0},
-    "LTM4655":   {"type":"buck","f_sw_hz":1e6,  "l_uh":1.5,"c_out_uf":47,  "rth_ja":6.5, "eta":0.92,"i_max":15.0},
-    "LTM4671":   {"type":"buck","f_sw_hz":1e6,  "l_uh":1.0,"c_out_uf":22,  "rth_ja":12.0,"eta":0.90,"i_max":4.0},
-    "LTM4675":   {"type":"buck","f_sw_hz":800e3,"l_uh":1.5,"c_out_uf":100, "rth_ja":5.5, "eta":0.92,"i_max":13.0},
-    "LTM4676A":  {"type":"buck","f_sw_hz":800e3,"l_uh":1.5,"c_out_uf":100, "rth_ja":5.5, "eta":0.92,"i_max":13.0},
-    "LTM4680":   {"type":"buck","f_sw_hz":500e3,"l_uh":2.0,"c_out_uf":220, "rth_ja":4.5, "eta":0.93,"i_max":10.0},
-    "LTM4700":   {"type":"buck","f_sw_hz":400e3,"l_uh":2.5,"c_out_uf":470, "rth_ja":2.5, "eta":0.94,"i_max":50.0},
-    "LTM4705":   {"type":"buck","f_sw_hz":300e3,"l_uh":3.0,"c_out_uf":680, "rth_ja":2.0, "eta":0.95,"i_max":40.0},
-    "TPSM82866A":{"type":"buck","f_sw_hz":2.2e6,"l_uh":0.47,"c_out_uf":22, "rth_ja":20.0,"eta":0.88,"i_max":6.0},
-    "LTM8067FC": {"type":"buck","f_sw_hz":1e6,  "l_uh":1.5,"c_out_uf":47,  "rth_ja":10.0,"eta":0.88,"i_max":0.6},
+    # Buck Converters           vin_range      f_sw      L      C_out  Rθja   η     I_max  ESR
+    "LTM4638":   {"type":"buck","vin_range":(4.5,20.0),"f_sw_hz":1e6,  "l_uh":1.5,"c_out_uf":47,  "rth_ja":8.0, "eta":0.91,"i_max":10.0,"esr_mohm":8},
+    "LTM4622":   {"type":"buck","vin_range":(2.7,17.0),"f_sw_hz":1.5e6,"l_uh":1.0,"c_out_uf":22,  "rth_ja":10.0,"eta":0.90,"i_max":4.0, "esr_mohm":12},
+    "LTM4622IV": {"type":"buck","vin_range":(2.7,17.0),"f_sw_hz":1.5e6,"l_uh":1.0,"c_out_uf":22,  "rth_ja":10.0,"eta":0.90,"i_max":4.0, "esr_mohm":12},
+    "LTM4630":   {"type":"buck","vin_range":(4.5,28.0),"f_sw_hz":800e3,"l_uh":1.5,"c_out_uf":100, "rth_ja":5.0, "eta":0.93,"i_max":15.0,"esr_mohm":6},
+    "LTM4630A":  {"type":"buck","vin_range":(4.5,28.0),"f_sw_hz":800e3,"l_uh":1.5,"c_out_uf":100, "rth_ja":5.0, "eta":0.93,"i_max":15.0,"esr_mohm":6},
+    "LTM4650":   {"type":"buck","vin_range":(4.5,20.0),"f_sw_hz":600e3,"l_uh":1.5,"c_out_uf":220, "rth_ja":4.0, "eta":0.93,"i_max":25.0,"esr_mohm":5},
+    "LTM4650-1": {"type":"buck","vin_range":(4.5,20.0),"f_sw_hz":600e3,"l_uh":1.5,"c_out_uf":220, "rth_ja":4.0, "eta":0.93,"i_max":25.0,"esr_mohm":5},
+    "LTM4655":   {"type":"buck","vin_range":(4.5,20.0),"f_sw_hz":1e6,  "l_uh":1.5,"c_out_uf":47,  "rth_ja":6.5, "eta":0.92,"i_max":15.0,"esr_mohm":8},
+    "LTM4671":   {"type":"buck","vin_range":(2.7,17.0),"f_sw_hz":1e6,  "l_uh":1.0,"c_out_uf":22,  "rth_ja":12.0,"eta":0.90,"i_max":4.0, "esr_mohm":12},
+    "LTM4675":   {"type":"buck","vin_range":(4.5,28.0),"f_sw_hz":800e3,"l_uh":1.5,"c_out_uf":100, "rth_ja":5.5, "eta":0.92,"i_max":13.0,"esr_mohm":7},
+    "LTM4676A":  {"type":"buck","vin_range":(4.5,28.0),"f_sw_hz":800e3,"l_uh":1.5,"c_out_uf":100, "rth_ja":5.5, "eta":0.92,"i_max":13.0,"esr_mohm":7},
+    "LTM4680":   {"type":"buck","vin_range":(4.5,20.0),"f_sw_hz":500e3,"l_uh":2.0,"c_out_uf":220, "rth_ja":4.5, "eta":0.93,"i_max":10.0,"esr_mohm":6},
+    "LTM4700":   {"type":"buck","vin_range":(4.5,60.0),"f_sw_hz":400e3,"l_uh":2.5,"c_out_uf":470, "rth_ja":2.5, "eta":0.94,"i_max":50.0,"esr_mohm":3},
+    "LTM4705":   {"type":"buck","vin_range":(4.5,60.0),"f_sw_hz":300e3,"l_uh":3.0,"c_out_uf":680, "rth_ja":2.0, "eta":0.95,"i_max":40.0,"esr_mohm":3},
+    "TPSM82866A":{"type":"buck","vin_range":(2.7,17.0),"f_sw_hz":2.2e6,"l_uh":0.47,"c_out_uf":22, "rth_ja":20.0,"eta":0.88,"i_max":6.0, "esr_mohm":15},
+    "LTM8067FC": {"type":"buck","vin_range":(3.1,40.0),"f_sw_hz":1e6,  "l_uh":1.5,"c_out_uf":47,  "rth_ja":10.0,"eta":0.88,"i_max":0.6, "esr_mohm":10},
     # LDO Regulators              rth    100Hz  10kHz  1MHz   Vdo   Imax
     "LT3070":    {"type":"ldo","rth_ja":34.0,"psrr":[74,65,40],"vdo":0.30,"i_max":4.0},
     "ADP1763":   {"type":"ldo","rth_ja":40.0,"psrr":[80,70,48],"vdo":0.35,"i_max":1.0},
@@ -58,10 +58,13 @@ def calc_buck_rail(v_in, v_out, i_out, spec, ta, req_ripple_mv, req_psrr_db):
     rth = spec["rth_ja"]
     D   = min(v_out / v_in, 0.99)
 
-    # Ripple
-    dIL    = (v_in - v_out) * D / (f * L)
-    dV_mv  = (dIL / (8 * f * C)) * 1000
-    rip_ok = dV_mv <= req_ripple_mv
+    # Ripple — includes capacitor ESR contribution
+    dIL        = (v_in - v_out) * D / (f * L)
+    esr_mohm   = spec.get("esr_mohm", 10)          # typ. ceramic ESR from spec
+    dV_cap_mv  = (dIL / (8 * f * C)) * 1000         # capacitive ripple
+    dV_esr_mv  = dIL * (esr_mohm / 1000) * 1000     # ESR ripple
+    dV_mv      = math.sqrt(dV_cap_mv**2 + dV_esr_mv**2)  # total (quadrature sum)
+    rip_ok     = dV_mv <= req_ripple_mv
 
     # Thermal
     pdiss = (1 - eta) * v_out * i_out
@@ -79,7 +82,9 @@ def calc_buck_rail(v_in, v_out, i_out, spec, ta, req_ripple_mv, req_psrr_db):
 
     return {
         "ripple": {
-            "calculation": f"D={v_out}/{v_in}={D:.3f}; dIL=({v_in}-{v_out})*{D:.3f}/({f/1e6:.1f}MHz*{spec['l_uh']}uH)={dIL:.3f}A; dV=dIL/(8*{f/1e6:.1f}MHz*{spec['c_out_uf']}uF)={dV_mv:.1f}mV",
+            "calculation": (f"D={v_out}/{v_in}={D:.3f}; dIL={dIL:.3f}A; "
+                            f"dV_cap={dV_cap_mv:.1f}mV; dV_ESR(ESR={esr_mohm}mΩ)={dV_esr_mv:.1f}mV; "
+                            f"dV_total=√({dV_cap_mv:.1f}²+{dV_esr_mv:.1f}²)={dV_mv:.1f}mV"),
             "value": f"{dV_mv:.1f} mV",
             "status": "Pass" if rip_ok else "Fail"
         },
@@ -89,12 +94,12 @@ def calc_buck_rail(v_in, v_out, i_out, spec, ta, req_ripple_mv, req_psrr_db):
             "status": "Pass" if p_ok else "Fail"
         },
         "thermal": {
-            "calculation": f"P_diss=(1-{eta})*{v_out}V*{i_out}A={pdiss:.2f}W; Tj={ta}C+{pdiss:.2f}W*{rth}C/W={tj:.1f}C",
+            "calculation": f"P_diss=(1-{eta})*{v_out}V*{i_out}A={pdiss:.2f}W; Tj={ta}°C+{pdiss:.2f}W*{rth}°C/W={tj:.1f}°C",
             "value": f"{tj:.1f} °C",
             "status": "Pass" if t_ok else "Fail"
         },
         "derating": {
-            "calculation": f"I_max={i_max}A / I_load={i_out}A = {derating:.2f}x (required \u22651.5x, recommended \u22651.75x)",
+            "calculation": f"I_max={i_max}A / I_load={i_out}A = {derating:.2f}x (required ≥1.5x, recommended ≥1.75x)",
             "value": f"{derating:.2f}x",
             "status": "Pass" if d_ok else ("Warn" if d_warn else "Fail")
         }

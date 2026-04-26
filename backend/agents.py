@@ -6,6 +6,7 @@ Agent 3: Schematic Generator
 Agent 1b: Correction Agent (Phase 3 - feedback loop)
 """
 import json
+import asyncio
 from openai import AsyncOpenAI
 
 
@@ -24,25 +25,34 @@ SYS_JSON = "You output strictly valid JSON only. No markdown fences, no comments
 
 
 async def _llm(client, prompt: str) -> str:
-    """Single LLM call, returns raw text."""
-    resp = await client.chat.completions.create(
-        model="openrouter/auto",
-        messages=[
-            {"role": "system", "content": SYS_JSON},
-            {"role": "user",   "content": prompt},
-        ],
-        extra_headers=HEADERS,
+    """Single LLM call with 60s timeout, returns raw text."""
+    resp = await asyncio.wait_for(
+        client.chat.completions.create(
+            model="openrouter/auto",
+            messages=[
+                {"role": "system", "content": SYS_JSON},
+                {"role": "user",   "content": prompt},
+            ],
+            extra_headers=HEADERS,
+        ),
+        timeout=60.0,
     )
     return resp.choices[0].message.content
 
 
-def _extract_json(text: str) -> dict:
-    """Robustly pull the first JSON object from LLM text."""
-    s = text.find("{")
-    e = text.rfind("}")
-    if s == -1 or e == -1:
-        raise ValueError(f"No JSON found in response: {text[:200]}")
-    return json.loads(text[s:e+1])
+def _extract_json(text: str):
+    """Robustly pull the first JSON object or array from LLM text."""
+    text = text.strip()
+    # Try object first, then array
+    for open_c, close_c in [('{', '}'), ('[', ']')]:
+        s = text.find(open_c)
+        e = text.rfind(close_c)
+        if s != -1 and e != -1 and e > s:
+            try:
+                return json.loads(text[s:e+1])
+            except json.JSONDecodeError:
+                continue
+    raise ValueError(f"No valid JSON found in LLM response: {text[:300]}")
 
 
 # ── Smart DB Filter (Phase 3) ─────────────────────────────────────────────────
