@@ -290,24 +290,24 @@ STRICT MERMAID SYNTAX RULES — violating any of these causes a blank diagram:
 6. NO subgraph blocks (causes rendering issues)
 7. Every line must be a valid edge definition: NodeA -->|label| NodeB
 8. Use \\n inside quoted labels for multi-line, not actual newlines
-9. **COMPONENT NUMBERING**: Add reference designator prefix to each component label:
-   - Buck converters: U1, U2, U3... (e.g., "U1: LTM4638\\n10A Buck")
-   - LDO regulators: U4, U5, U6... (continue numbering after Bucks)
+9. **COMPONENT NUMBERING WITH DUPLICATE DETECTION**:
+   - If the SAME component part is used multiple times, list ALL unit numbers together:
+     Example: If LTM4638 is used 3 times: "U1,U2,U3: LTM4638\\nBuck Converter"
+   - If a component is used only once: "U4: TPS7A85A\\nLDO Regulator"
    - Output rails: V1, V2, V3... (e.g., "V1: 3.3V @ 6A")
 
-VALID EXAMPLE (use this exact pattern):
+VALID EXAMPLE (same component used multiple times):
 graph TD
-    VIN["VIN: 12V Input"] -->|"12V"| U1["U1: LTM4638\\n10A Buck"]
-    VIN -->|"12V"| U2["U2: LTM4630\\n15A Buck"]
-    U1 -->|"3.3V 6A"| V1["V1: 3.3V @ 6A"]
-    U1 -->|"1.8V 2A"| U3["U3: ADP1763\\nLDO 1A"]
-    U2 -->|"1.0V 4A"| V2["V2: 1.0V @ 4A"]
-    U3 -->|"1.8V 2A"| V3["V3: 1.8V @ 2A"]
+    VIN["VIN: 12V Input"] -->|"12V"| BUCK1["U1,U2,U3: LTM4638\\nBuck Converter"]
+    BUCK1 -->|"3.3V 6A"| V1["V1: 3.3V @ 6A"]
+    BUCK1 -->|"5V 4A"| V2["V2: 5V @ 4A"]
+    BUCK1 -->|"1.8V 2A"| LDO1["U4: TPS7A85A\\nLDO Regulator"]
+    LDO1 -->|"1.8V 2A"| V3["V3: 1.8V @ 2A"]
 
 Return ONLY valid JSON (no markdown fences, no comments):
 {{
   "schematics": [
-    "graph TD\\n    VIN[\\"VIN: 12V Input\\"] -->|\\"12V\\"| U1[\\"U1: LTM4638\\"]\\n    U1 -->|\\"3.3V 6A\\"| V1[\\"V1: 3.3V\\"]",
+    "graph TD\\n    VIN[\\"VIN: 12V Input\\"] -->|\\"12V\\"| BUCK1[\\"U1,U2,U3: LTM4638\\"]\\n    BUCK1 -->|\\"3.3V 6A\\"| V1[\\"V1: 3.3V\\"]",
     "graph TD\\n    ...",
     "graph TD\\n    ..."
   ]

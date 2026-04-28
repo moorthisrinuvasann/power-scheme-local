@@ -423,56 +423,88 @@ function buildFallbackMermaid(railAssignments) {
     lines.push('    VIN["VIN: 12V Input"]');
 
     var nodeMap = {};
-    var buckIdx = 1;  // U1, U2, U3... for Bucks
-    var ldoIdx  = 1;  // U4, U5, U6... for LDOs (starts after Bucks)
-    var railIdx = 1;  // V1, V2, V3... for rails
+    var railIdx = 1;
 
-    // First pass: count Bucks and LDOs to set LDO starting number
-    var buckCount = 0;
+    // First pass: count occurrences of each component
+    var compCount = {};
+    var bucks = [];
+    var ldos = [];
+
     (railAssignments || []).forEach(function(ra) {
+        var comp  = ra.component || 'IC';
         var ctype = (ra.comp_type || ra.component_type || '').toLowerCase();
-        if (ctype === 'buck') buckCount++;
+        if (ctype === 'buck') {
+            bucks.push(ra);
+            compCount[comp] = (compCount[comp] || 0) + 1;
+        } else if (ctype === 'ldo') {
+            ldos.push(ra);
+            compCount[comp] = (compCount[comp] || 0) + 1;
+        }
     });
-    ldoIdx = buckCount + 1;
 
-    (railAssignments || []).forEach(function(ra) {
+    // Build component -> U# mapping with duplicate notation
+    var compToU = {};
+    var nextU = 1;
+    for (var comp in compCount) {
+        var count = compCount[comp];
+        if (count > 1) {
+            // Multiple same components: U1,U2,U3: PartName
+            var uIds = [];
+            for (var c = 0; c < count; c++) {
+                uIds.push('U' + nextU);
+                nextU++;
+            }
+            compToU[comp] = uIds.join(',') + ': ';
+        } else {
+            // Single component: U1: PartName
+            compToU[comp] = 'U' + nextU + ': ';
+            nextU++;
+        }
+    }
+
+    // Draw Bucks
+    bucks.forEach(function(ra) {
         var comp  = ra.component || 'IC';
         var rail  = ra.rail  || 'Rail';
         var vout  = ra.v_out  || '?';
         var iout  = ra.i_out  || '?';
-        var ctype = (ra.comp_type || ra.component_type || '').toLowerCase();
 
+        var nodeId = 'BUCK_' + comp.replace(/[^A-Za-z0-9]/g, '') + '_' + railIdx;
+        var label = compToU[comp] + comp + '\\nBuck ' + vout + 'V/' + iout + 'A';
+        nodeMap[rail] = nodeId;
+
+        lines.push('    VIN -->|"' + vout + 'V ' + iout + 'A"| ' + nodeId + '["' + label + '"]');
+
+        // Add rail node
+        var railNodeId = 'V' + railIdx;
+        lines.push('    ' + nodeId + ' -->|"' + vout + 'V"| ' + railNodeId + '["V' + railIdx + ': ' + vout + 'V @ ' + iout + 'A"]');
+        railIdx++;
+    });
+
+    // Draw LDOs
+    ldos.forEach(function(ra) {
+        var comp  = ra.component || 'IC';
+        var rail  = ra.rail  || 'Rail';
+        var vout  = ra.v_out  || '?';
+        var iout  = ra.i_out  || '?';
         var upstream = ra.upstream_component || '';
-        var src = 'VIN';
 
-        if (ctype === 'buck') {
-            // Buck converter: U1, U2, U3...
-            var nodeId = 'BUCK' + buckIdx;
-            var label = 'U' + buckIdx + ': ' + comp + '\\nBuck ' + vout + 'V/' + iout + 'A';
-            nodeMap[rail] = nodeId;
-            nodeMap[comp] = nodeId;
-            lines.push('    ' + src + ' -->|"' + vout + 'V ' + iout + 'A"| ' + nodeId + '["' + label + '"]');
-            buckIdx++;
-            // Add rail node
-            var railNodeId = 'V' + railIdx;
-            lines.push('    ' + nodeId + ' -->|"' + vout + 'V"| ' + railNodeId + '["V' + railIdx + ': ' + vout + 'V @ ' + iout + 'A"]');
-            railIdx++;
-        } else if (ctype === 'ldo') {
-            // LDO regulator: U4, U5, U6... (continues after Bucks)
-            var nodeId = 'LDO' + (ldoIdx - buckCount);
-            var label = 'U' + ldoIdx + ': ' + comp + '\\nLDO ' + vout + 'V/' + iout + 'A';
-            // Find upstream buck node
-            for (var k in nodeMap) {
-                if (k && upstream && k.indexOf(upstream) !== -1) { src = nodeMap[k]; break; }
-            }
-            nodeMap[rail] = nodeId;
-            lines.push('    ' + src + ' -->|"' + vout + 'V ' + iout + 'A"| ' + nodeId + '["' + label + '"]');
-            ldoIdx++;
-            // Add rail node
-            var railNodeId = 'V' + railIdx;
-            lines.push('    ' + nodeId + ' -->|"' + vout + 'V"| ' + railNodeId + '["V' + railIdx + ': ' + vout + 'V @ ' + iout + 'A"]');
-            railIdx++;
+        var nodeId = 'LDO_' + comp.replace(/[^A-Za-z0-9]/g, '') + '_' + railIdx;
+        var label = compToU[comp] + comp + '\\nLDO ' + vout + 'V/' + iout + 'A';
+        nodeMap[rail] = nodeId;
+
+        // Find upstream buck node
+        var src = 'VIN';
+        for (var k in nodeMap) {
+            if (k && upstream && k.indexOf(upstream) !== -1) { src = nodeMap[k]; break; }
         }
+
+        lines.push('    ' + src + ' -->|"' + vout + 'V ' + iout + 'A"| ' + nodeId + '["' + label + '"]');
+
+        // Add rail node
+        var railNodeId = 'V' + railIdx;
+        lines.push('    ' + nodeId + ' -->|"' + vout + 'V"| ' + railNodeId + '["V' + railIdx + ': ' + vout + 'V @ ' + iout + 'A"]');
+        railIdx++;
     });
 
     if (lines.length === 2) {
