@@ -88,26 +88,13 @@ Ripple: <15mV" style="width:100%; background: rgba(15,23,42,0.6); border: 1px so
                     </div>
                 </div>
 
-                <!-- Tab: Override Components | Re-generate -->
+                <!-- Tab: Add Constraints & Re-generate -->
                 <div class="refine-tabs">
-                    <div class="refine-tab active" id="tabOverride" onclick="switchRefineTab('override')">✏️ Override Components &amp; Re-analyze</div>
-                    <div class="refine-tab" id="tabRegenerate" onclick="switchRefineTab('regen')">🔄 Add Constraints &amp; Re-generate</div>
-                </div>
-
-                <!-- Override pane -->
-                <div id="refineOverridePane" style="padding:1rem 1.5rem 1.5rem;">
-                    <p style="color:#94a3b8;font-size:0.83rem;margin-bottom:1rem;">
-                        ⚠️ Failed rails are <span style="color:#f87171;font-weight:700;">highlighted in red</span>.
-                        Edit any component name below, then click Re-analyze.
-                    </p>
-                    <div id="overrideContent"></div>
-                    <button id="analyzeBtn" class="analyze-btn" style="margin-top:1.2rem;">
-                        🔬 Re-analyze with My Changes
-                    </button>
+                    <div class="refine-tab active">🔄 Add Constraints &amp; Re-generate</div>
                 </div>
 
                 <!-- Re-generate pane -->
-                <div id="refineRegenPane" style="padding:1rem 1.5rem 1.5rem; display:none;">
+                <div id="refineRegenPane" style="padding:1rem 1.5rem 1.5rem;">
                     <p style="color:#94a3b8;font-size:0.83rem;margin-bottom:0.75rem;">
                         Add new constraints or corrections. They will be appended to your original requirements before a full re-generation.
                     </p>
