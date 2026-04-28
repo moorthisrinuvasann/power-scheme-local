@@ -283,27 +283,31 @@ Generate one Mermaid flowchart per power scheme for these designs:
 
 STRICT MERMAID SYNTAX RULES — violating any of these causes a blank diagram:
 1. ALWAYS start with exactly: graph TD
-2. Node IDs: ONLY letters and numbers, NO spaces, NO hyphens, NO underscores (use VIN, BUCK1, LDO1, RAIL1, etc.)
-3. Node labels: ALWAYS wrap in square brackets with quotes if special chars exist: A["LTM4638\\n10A Buck"]
+2. Node IDs: ONLY letters and numbers, NO spaces, NO hyphens, NO underscores (use VIN, BUCK1, BUCK2, LDO1, LDO2, RAIL1, etc.)
+3. Node labels: ALWAYS wrap in square brackets with quotes if special chars exist: A["U1: LTM4638\\n10A Buck"]
 4. Edge labels: Use ---->|label| format, label must NOT contain parentheses
 5. NO semicolons at end of lines
 6. NO subgraph blocks (causes rendering issues)
 7. Every line must be a valid edge definition: NodeA -->|label| NodeB
 8. Use \\n inside quoted labels for multi-line, not actual newlines
+9. **COMPONENT NUMBERING**: Add reference designator prefix to each component label:
+   - Buck converters: U1, U2, U3... (e.g., "U1: LTM4638\\n10A Buck")
+   - LDO regulators: U4, U5, U6... (continue numbering after Bucks)
+   - Output rails: V1, V2, V3... (e.g., "V1: 3.3V @ 6A")
 
 VALID EXAMPLE (use this exact pattern):
 graph TD
-    VIN["12V Input"] -->|"12V"| BUCK1["LTM4638\\nBuck 10A"]
-    VIN -->|"12V"| BUCK2["LTM4630\\nBuck 15A"]
-    BUCK1 -->|"3.3V 6A"| RAIL1["3.3V Rail"]
-    BUCK1 -->|"1.8V 2A"| LDO1["ADP1763\\nLDO 1A"]
-    BUCK2 -->|"1.0V 4A"| RAIL2["1.0V Rail"]
-    LDO1 -->|"1.8V 2A"| RAIL3["1.8V Rail"]
+    VIN["VIN: 12V Input"] -->|"12V"| U1["U1: LTM4638\\n10A Buck"]
+    VIN -->|"12V"| U2["U2: LTM4630\\n15A Buck"]
+    U1 -->|"3.3V 6A"| V1["V1: 3.3V @ 6A"]
+    U1 -->|"1.8V 2A"| U3["U3: ADP1763\\nLDO 1A"]
+    U2 -->|"1.0V 4A"| V2["V2: 1.0V @ 4A"]
+    U3 -->|"1.8V 2A"| V3["V3: 1.8V @ 2A"]
 
 Return ONLY valid JSON (no markdown fences, no comments):
 {{
   "schematics": [
-    "graph TD\\n    VIN[\\"12V Input\\"] -->|\\"12V\\"| BUCK1[\\"LTM4638\\"]\\n    BUCK1 -->|\\"3.3V 6A\\"| R1[\\"3.3V Rail\\"]",
+    "graph TD\\n    VIN[\\"VIN: 12V Input\\"] -->|\\"12V\\"| U1[\\"U1: LTM4638\\"]\\n    U1 -->|\\"3.3V 6A\\"| V1[\\"V1: 3.3V\\"]",
     "graph TD\\n    ...",
     "graph TD\\n    ..."
   ]
