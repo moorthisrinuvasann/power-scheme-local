@@ -102,27 +102,47 @@ def run_drc(rail_assignments: list, req_params: dict) -> list:
 def check_calc_failures(rail_analysis: list) -> list:
     """
     Inspects Python calculator results for any Fail status.
-    Returns list of failed rail dicts.
+    Returns list of failed rail dicts with severity field for frontend display.
     """
     failures = []
     for r in rail_analysis:
-        for atype in ["ripple", "psrr", "thermal", "derating"]:   # ← derating added
+        for atype in ["ripple", "psrr", "thermal", "derating"]:
             data = r.get(atype, {})
             if str(data.get("status", "")).lower() == "fail":
+                # Determine severity: derating/warning -> WARNING, others -> ERROR
+                severity = "WARNING" if atype == "derating" else "ERROR"
                 failures.append({
                     "rail":          r.get("rail", ""),
                     "component":     r.get("component", ""),
                     "analysis_type": atype,
+                    "severity":      severity,
                     "value":         data.get("value", ""),
                     "calculation":   data.get("calculation", ""),
+                    "rule":          f"{atype.capitalize()} Check",
+                    "detail":        data.get("calculation", ""),
+                    "fix":           _get_fix_hint(atype, r, data),
                 })
     return failures
 
 
+def _get_fix_hint(atype: str, rail: dict, data: dict) -> str:
+    """Generate a fix hint for calculator failures."""
+    comp = rail.get("component", "")
+    if atype == "thermal":
+        return f"Select component with lower Rθja or reduce power dissipation"
+    elif atype == "ripple":
+        return f"Increase output capacitance or use lower ESR capacitors"
+    elif atype == "psrr":
+        return f"Use LDO with higher PSRR or add additional filtering"
+    elif atype == "derating":
+        return f"Select component with higher I_max (need ≥ {rail.get('i_out', 1) * 1.5:.1f}A)"
+    return "Review component selection"
+
+
 # ── Summarise DRC for SSE progress message ───────────────────────────────────
 def drc_summary(violations: list) -> str:
-    errors   = [v for v in violations if v["severity"] == "ERROR"]
-    warnings = [v for v in violations if v["severity"] == "WARNING"]
+    errors   = [v for v in violations if v.get("severity") == "ERROR"]
+    warnings = [v for v in violations if v.get("severity") == "WARNING"]
     if not violations:
         return "DRC: All rules passed ✓"
     parts = []

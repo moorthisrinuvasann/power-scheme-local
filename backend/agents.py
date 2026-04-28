@@ -12,7 +12,7 @@ from openai import AsyncOpenAI
 
 def _make_client(api_key: str) -> AsyncOpenAI:
     return AsyncOpenAI(
-        base_url="https://openrouter.ai/api/v1",
+        base_url="https://llmapi05.datapatterns.co.in",
         api_key=api_key,
     )
 
@@ -29,19 +29,18 @@ async def _llm(client, prompt: str, max_tokens: int = 4000) -> str:
     try:
         resp = await asyncio.wait_for(
             client.chat.completions.create(
-                model="openrouter/auto",
+                model="claude-sonnet-4-6",
                 messages=[
                     {"role": "system", "content": SYS_JSON},
                     {"role": "user",   "content": prompt},
                 ],
                 max_tokens=max_tokens,
-                extra_headers=HEADERS,
             ),
             timeout=180.0,
         )
         return resp.choices[0].message.content
     except asyncio.TimeoutError:
-        raise RuntimeError("LLM call timed out after 180s. OpenRouter may be slow — please retry.")
+        raise RuntimeError("LLM call timed out after 180s.")
 
 
 def _extract_json(text: str):

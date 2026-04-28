@@ -176,7 +176,10 @@ async def generate_scheme(file: UploadFile = File(...), api_key: str = Form(...)
                             scheme["drc_violations"] = new_violations
                             scheme["drc_summary"]    = drc_summary(new_violations)
                     except Exception as corr_err:
-                        scheme["correction_log"] = [f"Correction agent error: {str(corr_err)}"]
+                        import traceback
+                        err_msg = f"Correction agent error: {str(corr_err)}"
+                        tb = traceback.format_exc().replace('\n', ' | ').replace('<', '[').replace('>', ']')
+                        scheme["correction_log"] = [f"{err_msg} | {tb}"]
 
             yield sse_event("progress", {"step": 6, "total": 6,
                 "message": "✅ All checks complete. Building final report..."})
@@ -332,7 +335,10 @@ async def analyze_scheme(request: Request):
                             scheme["drc_violations"]   = new_v
                             scheme["drc_summary"]      = drc_summary(new_v)
                     except Exception as corr_err:
-                        scheme["correction_log"] = [f"Correction agent error: {str(corr_err)}"]
+                        import traceback
+                        err_msg = f"Correction agent error: {str(corr_err)}"
+                        tb = traceback.format_exc().replace('\n', ' | ').replace('<', '[').replace('>', ']')
+                        scheme["correction_log"] = [f"{err_msg} | {tb}"]
 
             yield sse_event("progress", {"step": 3, "total": 3,
                 "message": "✅ All checks complete. Building final report..."})
