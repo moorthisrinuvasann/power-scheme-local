@@ -24,7 +24,7 @@ HEADERS = {
 SYS_JSON = "You output strictly valid JSON only. No markdown fences, no comments, no trailing commas."
 
 
-async def _llm(client, prompt: str, max_tokens: int = 4000) -> str:
+async def _llm(client, prompt: str, max_tokens: int = 16000) -> str:
     """Single LLM call with 180s timeout, returns raw text."""
     try:
         resp = await asyncio.wait_for(
@@ -85,6 +85,38 @@ def _extract_json(text: str):
             return json.loads(m.group(1))
         except json.JSONDecodeError:
             pass
+
+    # Strategy 5: Try to fix truncated JSON by closing unclosed braces
+    # Find the start of JSON
+    start = text.find('{')
+    if start == -1:
+        start = text.find('[')
+    if start == -1:
+        print(f"[WARN] _extract_json failed. No JSON found. Response preview: {original[:200]}")
+        raise ValueError(f"LLM returned non-JSON. Response preview: {original[:200]}")
+
+    # Try closing with increasing number of braces
+    for close_str in ['}]', ']}', ']}', '}', ']']:
+        candidate = text[start:] + close_str
+        try:
+            return json.loads(candidate)
+        except json.JSONDecodeError:
+            continue
+
+    # Try finding the last valid JSON object by progressively truncating
+    end = len(text)
+    while end > start + 10:
+        end -= 50  # Step back in chunks
+        candidate = text[start:end]
+        # Close any open braces
+        open_braces = candidate.count('{') - candidate.count('}')
+        open_brackets = candidate.count('[') - candidate.count(']')
+        if open_braces >= 0 and open_brackets >= 0:
+            candidate += '}' * open_braces + ']' * open_brackets
+            try:
+                return json.loads(candidate)
+            except json.JSONDecodeError:
+                continue
 
     print(f"[WARN] _extract_json failed. Raw response (first 500 chars):\n{original[:500]}")
     print(f"[WARN] Response length: {len(original)} chars")
@@ -349,7 +381,7 @@ Return ONLY valid JSON:
   ]
 }}"""
     client = _make_client(api_key)
-    raw = await _llm(client, prompt, max_tokens=2000)
+    raw = await _llm(client, prompt, max_tokens=8000)
     try:
         return _extract_json(raw)
     except ValueError:
