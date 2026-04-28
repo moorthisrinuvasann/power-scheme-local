@@ -204,7 +204,10 @@ Return ONLY valid JSON:
 # ─────────────────────────────────────────────────────────────────────────────
 async def agent_topology_designer(requirements: str, agent1_result: dict, api_key: str) -> dict:
     """Returns rail_assignments with v_in, upstream_component, switching_frequency."""
-    schemes_summary = json.dumps(agent1_result["schemes"], indent=2)
+    schemes_data = agent1_result.get("schemes", [])
+    if not schemes_data:
+        raise ValueError("Agent 1 did not return any schemes. Please retry.")
+    schemes_summary = json.dumps(schemes_data, indent=2)
 
     prompt = f"""
 You are a power distribution topology expert.
@@ -265,8 +268,10 @@ Return ONLY valid JSON:
 # ─────────────────────────────────────────────────────────────────────────────
 async def agent_schematic_generator(schemes: list, api_key: str) -> list:
     """Returns list of mermaid code strings, one per scheme."""
+    if not schemes:
+        return []
     schemes_summary = json.dumps([
-        {"scheme_name": s["scheme_name"], "rail_assignments": s.get("rail_assignments", [])}
+        {"scheme_name": s.get("scheme_name", "Scheme"), "rail_assignments": s.get("rail_assignments", [])}
         for s in schemes
     ], indent=2)
 
