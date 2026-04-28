@@ -712,9 +712,8 @@ async function renderResults(data) {
             + '<div style="color:#94a3b8;font-size:0.9rem;margin-bottom:0.5rem;"><strong style="color:#e2e8f0;">Switching Frequency:</strong> ' + (s.switching_frequency || 'N/A') + '</div>'
             + buildDrcPanel(s)
             + '<div class="result-card diagram-card" style="margin-bottom:1.5rem;background:white;"><h2 style="color:#1e293b;">Schematics</h2><div class="mermaid-view">' + svgOut + '</div></div>'
-            + '<div class="results-grid">'
             + '<div class="result-card"><h2>Selected Components</h2><div>' + buildComponents(s.selected_components) + '</div></div>'
-            + '<div class="result-card" style="grid-column: span 1;"><h2>Engineering Analysis — Per Rail</h2>' + buildRailAnalysisTable(s.rail_analysis) + '</div>'
+            + '<div class="result-card"><h2>Engineering Analysis — Per Rail</h2>' + buildRailAnalysisTable(s.rail_analysis) + '</div>'
             + '</div></div>';
 
         container.innerHTML += block;

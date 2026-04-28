@@ -279,6 +279,7 @@ input[type="password"]:focus {
     border: 1px solid var(--border);
     border-radius: 16px;
     padding: 1.5rem;
+    overflow: hidden;
 }
 
 .result-card h2 {
@@ -360,6 +361,7 @@ input[type="password"]:focus {
     width: 100%;
     border-collapse: collapse;
     margin-top: 0.5rem;
+    min-width: 600px;
 }
 
 .thermal-table th, .thermal-table td {
@@ -373,10 +375,16 @@ input[type="password"]:focus {
     font-weight: 600;
     color: var(--primary);
     background: rgba(255, 255, 255, 0.05);
+    white-space: nowrap;
 }
 
 .thermal-table tr:last-child td {
     border-bottom: none;
+}
+
+/* Ensure result-card contains overflow-x tables properly */
+.result-card > div[style*="overflow-x"] {
+    width: 100%;
 }
 
 .status-pass {
