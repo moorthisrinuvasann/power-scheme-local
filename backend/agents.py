@@ -136,6 +136,7 @@ SELECTION RULES:
 3. LDO input must come from an existing Buck output rail. Choose LDO with lowest dropout voltage.
 4. Provide EXACTLY 3 different scheme options. Vary topology: more Bucks vs more LDOs, high-efficiency vs low-cost vs best thermal.
 5. Include indirect load currents: if a Buck feeds LDOs, add all LDO load currents to the Buck's required current.
+6. RESPECT ANY USER-SPECIFIED CONSTRAINTS (e.g., "V7 must use LDO", "Use only ADI components", etc.) — these override default selection preferences.
 
 Return ONLY valid JSON:
 {{
@@ -188,6 +189,7 @@ TOPOLOGY RULES:
 4. Assign switching_frequency from datasheet: LTM4638=1MHz, LTM4622=1.5MHz, LTM4630=800kHz, LTM4650=600kHz, LTM4655=1MHz, LTM4671=1MHz, LTM4675=800kHz, LTM4680=500kHz, TPSM82866A=2.2MHz. Default=1MHz.
 5. LDOs have no switching frequency — use the upstream Buck's frequency.
 6. Generate a concise "final_summary" comparing all 3 schemes.
+7. RESPECT USER CONSTRAINTS from requirements (e.g., "V7 must use LDO") — do not override component choices made by Agent 1 based on constraints.
 
 Return ONLY valid JSON:
 {{
