@@ -442,35 +442,23 @@ function buildFallbackMermaid(railAssignments) {
         }
     });
 
-    // Build component -> U# mapping with duplicate notation
-    var compToU = {};
-    var nextU = 1;
-    for (var comp in compCount) {
-        var count = compCount[comp];
-        if (count > 1) {
-            // Multiple same components: U1,U2,U3: PartName
-            var uIds = [];
-            for (var c = 0; c < count; c++) {
-                uIds.push('U' + nextU);
-                nextU++;
-            }
-            compToU[comp] = uIds.join(',') + ': ';
-        } else {
-            // Single component: U1: PartName
-            compToU[comp] = 'U' + nextU + ': ';
-            nextU++;
-        }
-    }
+    // Build component -> instance counter mapping
+    var compInstance = {};  // Track which instance number each rail gets
 
-    // Draw Bucks
+    // Draw Bucks - each instance gets its own numbered node
     bucks.forEach(function(ra) {
         var comp  = ra.component || 'IC';
         var rail  = ra.rail  || 'Rail';
         var vout  = ra.v_out  || '?';
         var iout  = ra.i_out  || '?';
 
-        var nodeId = 'BUCK_' + comp.replace(/[^A-Za-z0-9]/g, '') + '_' + railIdx;
-        var label = compToU[comp] + comp + '\\nBuck ' + vout + 'V/' + iout + 'A';
+        // Track instance number for this component
+        compInstance[comp] = (compInstance[comp] || 0) + 1;
+        var instanceNum = compInstance[comp];
+
+        var nodeId = 'BUCK_' + railIdx;
+        // Label format: LTM4638-1, LTM4638-2, etc.
+        var label = comp + '-' + instanceNum + '\\nBuck ' + vout + 'V/' + iout + 'A';
         nodeMap[rail] = nodeId;
 
         lines.push('    VIN -->|"' + vout + 'V ' + iout + 'A"| ' + nodeId + '["' + label + '"]');
@@ -481,7 +469,10 @@ function buildFallbackMermaid(railAssignments) {
         railIdx++;
     });
 
-    // Draw LDOs
+    // Reset counter for LDOs
+    compInstance = {};
+
+    // Draw LDOs - each instance gets its own numbered node
     ldos.forEach(function(ra) {
         var comp  = ra.component || 'IC';
         var rail  = ra.rail  || 'Rail';
@@ -489,8 +480,13 @@ function buildFallbackMermaid(railAssignments) {
         var iout  = ra.i_out  || '?';
         var upstream = ra.upstream_component || '';
 
-        var nodeId = 'LDO_' + comp.replace(/[^A-Za-z0-9]/g, '') + '_' + railIdx;
-        var label = compToU[comp] + comp + '\\nLDO ' + vout + 'V/' + iout + 'A';
+        // Track instance number for this component
+        compInstance[comp] = (compInstance[comp] || 0) + 1;
+        var instanceNum = compInstance[comp];
+
+        var nodeId = 'LDO_' + railIdx;
+        // Label format: TPS7A85A-1, TPS7A85A-2, etc.
+        var label = comp + '-' + instanceNum + '\\nLDO ' + vout + 'V/' + iout + 'A';
         nodeMap[rail] = nodeId;
 
         // Find upstream buck node

@@ -283,31 +283,32 @@ Generate one Mermaid flowchart per power scheme for these designs:
 
 STRICT MERMAID SYNTAX RULES — violating any of these causes a blank diagram:
 1. ALWAYS start with exactly: graph TD
-2. Node IDs: ONLY letters and numbers, NO spaces, NO hyphens, NO underscores (use VIN, BUCK1, BUCK2, LDO1, LDO2, RAIL1, etc.)
-3. Node labels: ALWAYS wrap in square brackets with quotes if special chars exist: A["U1: LTM4638\\n10A Buck"]
+2. Node IDs: ONLY letters and numbers, NO spaces, NO hyphens, NO underscores (use VIN, BUCK1, BUCK2, LDO1, LDO2, V1, V2, etc.)
+3. Node labels: ALWAYS wrap in square brackets with quotes if special chars exist
 4. Edge labels: Use ---->|label| format, label must NOT contain parentheses
 5. NO semicolons at end of lines
 6. NO subgraph blocks (causes rendering issues)
 7. Every line must be a valid edge definition: NodeA -->|label| NodeB
 8. Use \\n inside quoted labels for multi-line, not actual newlines
-9. **COMPONENT NUMBERING WITH DUPLICATE DETECTION**:
-   - If the SAME component part is used multiple times, list ALL unit numbers together:
-     Example: If LTM4638 is used 3 times: "U1,U2,U3: LTM4638\\nBuck Converter"
-   - If a component is used only once: "U4: TPS7A85A\\nLDO Regulator"
-   - Output rails: V1, V2, V3... (e.g., "V1: 3.3V @ 6A")
+9. **COMPONENT NUMBERING**: Each component instance gets its own numbered node:
+   - If LTM4638 is used for V3 and V4: show as "LTM4638-1" and "LTM4638-2" (separate nodes)
+   - If LTM4622 is used for V1: show as "LTM4622-1"
+   - Format: "PartName-1", "PartName-2", etc. for each instance
 
-VALID EXAMPLE (same component used multiple times):
+VALID EXAMPLE:
 graph TD
-    VIN["VIN: 12V Input"] -->|"12V"| BUCK1["U1,U2,U3: LTM4638\\nBuck Converter"]
-    BUCK1 -->|"3.3V 6A"| V1["V1: 3.3V @ 6A"]
-    BUCK1 -->|"5V 4A"| V2["V2: 5V @ 4A"]
-    BUCK1 -->|"1.8V 2A"| LDO1["U4: TPS7A85A\\nLDO Regulator"]
-    LDO1 -->|"1.8V 2A"| V3["V3: 1.8V @ 2A"]
+    VIN["VIN: 12V Input"] -->|"12V"| BUCK1["LTM4622-1\\nBuck 5V"]
+    VIN -->|"12V"| BUCK2["LTM4638-1\\nBuck 3.3V"]
+    VIN -->|"12V"| BUCK3["LTM4638-2\\nBuck 1.8V"]
+    BUCK1 -->|"5V 4A"| V1["V1: 5V @ 4A"]
+    BUCK2 -->|"3.3V 6A"| V2["V2: 3.3V @ 6A"]
+    BUCK3 -->|"1.8V 2A"| LDO1["TPS7A85A-1\\nLDO 1.2V"]
+    LDO1 -->|"1.2V 1A"| V3["V3: 1.2V @ 1A"]
 
 Return ONLY valid JSON (no markdown fences, no comments):
 {{
   "schematics": [
-    "graph TD\\n    VIN[\\"VIN: 12V Input\\"] -->|\\"12V\\"| BUCK1[\\"U1,U2,U3: LTM4638\\"]\\n    BUCK1 -->|\\"3.3V 6A\\"| V1[\\"V1: 3.3V\\"]",
+    "graph TD\\n    VIN[\\"VIN: 12V Input\\"] -->|\\"12V\\"| BUCK1[\\"LTM4622-1\\"]\\n    BUCK1 -->|\\"5V 4A\\"| V1[\\"V1: 5V\\"]",
     "graph TD\\n    ...",
     "graph TD\\n    ..."
   ]
