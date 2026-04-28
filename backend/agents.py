@@ -86,8 +86,9 @@ def _extract_json(text: str):
         except json.JSONDecodeError:
             pass
 
-    print(f"[WARN] _extract_json failed. Raw response (first 400 chars):\n{original[:400]}")
-    raise ValueError(f"LLM returned non-JSON. First 300 chars: {original[:300]}")
+    print(f"[WARN] _extract_json failed. Raw response (first 500 chars):\n{original[:500]}")
+    print(f"[WARN] Response length: {len(original)} chars")
+    raise ValueError(f"LLM returned non-JSON. Response preview: {original[:200]}")
 
 
 # ── Smart DB Filter (Phase 3) ─────────────────────────────────────────────────

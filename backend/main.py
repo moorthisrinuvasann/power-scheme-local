@@ -2,6 +2,7 @@ import json
 import re
 import sqlite3
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request
+from typing import List, Dict, Any
 from fastapi.responses import JSONResponse, FileResponse, StreamingResponse, HTMLResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
@@ -18,6 +19,47 @@ from backend.agents import (
 
 app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+
+
+def generate_mermaid_from_rails(rail_assignments: List[Dict[str, Any]]) -> str:
+    """
+    Generate a Mermaid flowchart from rail assignments.
+    Same logic as frontend's buildFallbackMermaid.
+    """
+    lines = ["graph TD"]
+    lines.append('    VIN["VIN Input"]')
+
+    node_map: Dict[str, str] = {}
+    node_idx = 0
+
+    for ra in rail_assignments or []:
+        comp = re.sub(r'[^A-Za-z0-9]', '', ra.get("component", "IC"))
+        rail = re.sub(r'[^A-Za-z0-9\s\.]', '', ra.get("rail", "Rail")).strip()
+        vout = ra.get("v_out", "?")
+        iout = ra.get("i_out", "?")
+        ctype = (ra.get("comp_type", "") or "").lower()
+
+        node_id = f"N{node_idx}"
+        node_map[ra.get("rail", "")] = node_id
+        node_idx += 1
+
+        label = f"{comp}\\\\n{vout}V/{iout}A"
+        upstream = ra.get("upstream_component", "")
+        src = "VIN"
+
+        # If LDO with upstream, find its node
+        if ctype == "ldo" and upstream:
+            for k, v in node_map.items():
+                if k and upstream in k:
+                    src = v
+                    break
+
+        lines.append(f'    {src} -->|"{vout}V {iout}A"| {node_id}["{label}"]')
+
+    if len(lines) == 2:
+        lines.append('    VIN -->|"12V"| OUT["Output Rails"]')
+
+    return "\n".join(lines)
 
 DB_PATH = "components.db"
 
@@ -144,6 +186,14 @@ async def generate_scheme(file: UploadFile = File(...), api_key: str = Form(...)
                 # ── PHASE 3: Correction Agent (only if failures found) ─────
                 all_issues = drc_violations + calc_failures
                 if all_issues:
+                    # Save BEFORE-correction state for comparison
+                    scheme["before_correction"] = {
+                        "rail_assignments": rail_assignments,
+                        "rail_analysis": scheme.get("rail_analysis", []),
+                        "drc_violations": drc_violations,
+                        "drc_summary": drc_summary(drc_violations),
+                    }
+
                     yield sse_event("progress", {"step": 5, "total": 6,
                         "message": f"⚠️ {len(all_issues)} issue(s) in '{scheme['scheme_name']}'. Running correction agent..."})
 
@@ -175,6 +225,12 @@ async def generate_scheme(file: UploadFile = File(...), api_key: str = Form(...)
                             new_violations = run_drc(scheme["rail_assignments"], req_params)
                             scheme["drc_violations"] = new_violations
                             scheme["drc_summary"]    = drc_summary(new_violations)
+
+                            # Generate BEFORE-correction Mermaid diagram
+                            before_mermaid = generate_mermaid_from_rails(
+                                scheme["before_correction"]["rail_assignments"]
+                            )
+                            scheme["before_correction"]["schematics_mermaid"] = before_mermaid
                     except Exception as corr_err:
                         import traceback
                         err_msg = f"Correction agent error: {str(corr_err)}"
@@ -310,6 +366,14 @@ async def analyze_scheme(request: Request):
 
                 all_issues = drc_violations + calc_failures
                 if all_issues:
+                    # Save BEFORE-correction state for comparison
+                    scheme["before_correction"] = {
+                        "rail_assignments": rail_assignments,
+                        "rail_analysis": scheme.get("rail_analysis", []),
+                        "drc_violations": drc_violations,
+                        "drc_summary": drc_summary(drc_violations),
+                    }
+
                     yield sse_event("progress", {"step": 2, "total": 3,
                         "message": f"⚠️ {len(all_issues)} issue(s) in '{scheme.get('scheme_name','')}'. Running correction agent..."})
                     try:
@@ -334,6 +398,12 @@ async def analyze_scheme(request: Request):
                             new_v = run_drc(scheme["rail_assignments"], req_params)
                             scheme["drc_violations"]   = new_v
                             scheme["drc_summary"]      = drc_summary(new_v)
+
+                            # Generate BEFORE-correction Mermaid diagram
+                            before_mermaid = generate_mermaid_from_rails(
+                                scheme["before_correction"]["rail_assignments"]
+                            )
+                            scheme["before_correction"]["schematics_mermaid"] = before_mermaid
                     except Exception as corr_err:
                         import traceback
                         err_msg = f"Correction agent error: {str(corr_err)}"

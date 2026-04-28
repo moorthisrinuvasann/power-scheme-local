@@ -500,9 +500,10 @@ async function renderResults(data) {
             + ' <span style="font-size:1rem;color:#10b981;">(Total: INR ' + (s.total_price || 0) + ')</span></h2>'
             + '<div style="color:#94a3b8;font-size:0.9rem;margin-bottom:0.5rem;"><strong style="color:#e2e8f0;">Switching Frequency:</strong> ' + (s.switching_frequency || 'N/A') + '</div>'
             + buildDrcPanel(s)
-            + '<div class="result-card diagram-card" style="margin-bottom:1.5rem;background:white;"><h2 style="color:#1e293b;">Schematics</h2><div class="mermaid-view">' + svgOut + '</div></div>'
+            + buildBeforeAfterPanel(s)
+            + '<div class="result-card diagram-card" style="margin-bottom:1.5rem;background:white;"><h2 style="color:#1e293b;">Schematics (After Correction)</h2><div class="mermaid-view">' + svgOut + '</div></div>'
             + '<div class="result-card"><h2>Selected Components</h2><div>' + buildComponents(s.selected_components) + '</div></div>'
-            + '<div class="result-card"><h2>Engineering Analysis — Per Rail</h2>' + buildRailAnalysisTable(s.rail_analysis) + '</div>'
+            + '<div class="result-card"><h2>Engineering Analysis — Per Rail (After Correction)</h2>' + buildRailAnalysisTable(s.rail_analysis) + '</div>'
             + '</div></div>';
 
         container.innerHTML += block;
@@ -580,6 +581,78 @@ function buildReportRailTable(rails) {
 
     html += '</tbody></table>';
     return html;
+}
+
+// ── Build Before/After Correction Panel ───────────────────────────────────────
+function buildBeforeAfterPanel(scheme) {
+    var before = scheme.before_correction;
+    var corrections = scheme.correction_log || [];
+
+    // No before-correction data means no corrections were applied
+    if (!before || !before.rail_assignments) {
+        return '';
+    }
+
+    var out = '<div class="result-card" style="margin-bottom:1.5rem;">';
+    out += '<h2 style="color:#10b981;">🔧 Auto-Correction Applied</h2>';
+    out += '<p style="color:#94a3b8;font-size:0.88rem;margin-bottom:1rem;">'
+         + 'The following issues were detected and automatically corrected by the Correction Agent.</p>';
+
+    // Correction log
+    if (corrections.length) {
+        out += '<div style="background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.3);border-radius:8px;padding:0.75rem;margin-bottom:1rem;">'
+             + '<div style="font-weight:700;color:#818cf8;margin-bottom:0.4rem;font-size:0.88rem;">Changes Made:</div>';
+        corrections.forEach(function(c) {
+            out += '<div style="font-size:0.82rem;color:#cbd5e1;padding:0.15rem 0;">✓ ' + c + '</div>';
+        });
+        out += '</div>';
+    }
+
+    // Before/After comparison table
+    out += '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:0.82rem;">'
+         + '<thead><tr style="background:rgba(15,23,42,0.5);">'
+         + '<th style="padding:0.5rem 0.6rem;text-align:left;color:#94a3b8;border-bottom:1px solid rgba(255,255,255,0.07);">Rail</th>'
+         + '<th style="padding:0.5rem 0.6rem;text-align:left;color:#94a3b8;border-bottom:1px solid rgba(255,255,255,0.07);">Before</th>'
+         + '<th style="padding:0.5rem 0.6rem;text-align:left;color:#94a3b8;border-bottom:1px solid rgba(255,255,255,0.07);">After</th>'
+         + '<th style="padding:0.5rem 0.6rem;text-align:left;color:#94a3b8;border-bottom:1px solid rgba(255,255,255,0.07);">Before Status</th>'
+         + '<th style="padding:0.5rem 0.6rem;text-align:left;color:#94a3b8;border-bottom:1px solid rgba(255,255,255,0.07);">After Status</th>'
+         + '</tr></thead><tbody>';
+
+    var beforeRails = before.rail_analysis || [];
+    var afterRails  = scheme.rail_analysis || [];
+
+    // Build lookup for before rails
+    var beforeMap = {};
+    beforeRails.forEach(function(r) { beforeMap[r.rail] = r; });
+
+    // Show comparison for corrected rails
+    var correctedNames = corrections.map(function(c) { return c.split(':')[0].trim(); });
+    correctedNames.forEach(function(railName) {
+        var b = beforeMap[railName];
+        var a = null;
+        afterRails.forEach(function(r) { if (r.rail === railName) a = r; });
+
+        if (b) {
+            var bStatus = (b.thermal?.status === 'Pass' && b.ripple?.status === 'Pass' && b.derating?.status === 'Pass') ? 'Pass' : 'Fail';
+            var aStatus = (a && a.thermal?.status === 'Pass' && a.ripple?.status === 'Pass' && a.derating?.status === 'Pass') ? 'Pass' : (a ? 'Fail' : 'N/A');
+            var bComp = b.component || 'N/A';
+            var aComp = a ? (a.component || 'N/A') : 'N/A';
+
+            var bStatusColor = bStatus === 'Pass' ? '#10b981' : '#ef4444';
+            var aStatusColor = aStatus === 'Pass' ? '#10b981' : '#ef4444';
+
+            out += '<tr style="border-bottom:1px solid rgba(255,255,255,0.05);">'
+                 + '<td style="padding:0.5rem 0.6rem;color:#e2e8f0;font-weight:600;">' + railName + '</td>'
+                 + '<td style="padding:0.5rem 0.6rem;color:#94a3b8;">' + bComp + '</td>'
+                 + '<td style="padding:0.5rem 0.6rem;color:#60a5fa;font-weight:600;">' + aComp + '</td>'
+                 + '<td style="padding:0.5rem 0.6rem;text-align:center;"><span style="color:' + bStatusColor + ';font-size:0.78rem;">' + bStatus + '</span></td>'
+                 + '<td style="padding:0.5rem 0.6rem;text-align:center;"><span style="color:' + aStatusColor + ';font-size:0.78rem;">' + aStatus + '</span></td>'
+                 + '</tr>';
+        }
+    });
+
+    out += '</tbody></table></div></div>';
+    return out;
 }
 
 // ── Build components for HTML REPORT (light theme) ───────────────────────────
@@ -705,19 +778,87 @@ document.getElementById('downloadBtn').onclick = function() {
             return out ? '<div class="card"><h3>DRC Validation &amp; Auto-Corrections</h3>'+out+'</div>' : '';
         }
 
+        // ── Build Before/After Correction Panel for HTML Report ─────────────────
+        function buildReportBeforeAfter(scheme) {
+            var before = scheme.before_correction;
+            var corrections = scheme.correction_log || [];
+
+            if (!before || !before.rail_assignments || !corrections.length) {
+                return '';
+            }
+
+            var out = '<div class="card"><h3>Before/After Auto-Correction Comparison</h3>';
+            out += '<p style="color:#64748b;font-size:0.9rem;margin-bottom:1rem;">'
+                 + 'The following corrections were automatically applied to fix design issues.</p>';
+
+            // Correction summary
+            out += '<div style="background:#eff6ff;border:1px solid #93c5fd;border-radius:8px;padding:1rem;margin-bottom:1rem;">'
+                 + '<div style="font-weight:700;color:#1d4ed8;margin-bottom:0.5rem;">Changes Made:</div>';
+            corrections.forEach(function(c) {
+                out += '<div style="font-size:0.85rem;color:#374151;padding:0.15rem 0;">✓ ' + c + '</div>';
+            });
+            out += '</div>';
+
+            // Comparison table
+            out += '<table style="width:100%;border-collapse:collapse;font-size:0.85rem;">'
+                 + '<thead><tr style="background:#f1f5f9;">'
+                 + '<th style="padding:0.6rem;text-align:left;border:1px solid #e2e8f0;">Rail</th>'
+                 + '<th style="padding:0.6rem;text-align:left;border:1px solid #e2e8f0;">Before</th>'
+                 + '<th style="padding:0.6rem;text-align:left;border:1px solid #e2e8f0;">After</th>'
+                 + '<th style="padding:0.6rem;text-align:left;border:1px solid #e2e8f0;">Before Status</th>'
+                 + '<th style="padding:0.6rem;text-align:left;border:1px solid #e2e8f0;">After Status</th>'
+                 + '</tr></thead><tbody>';
+
+            var beforeRails = before.rail_analysis || [];
+            var afterRails  = scheme.rail_analysis || [];
+
+            var beforeMap = {};
+            beforeRails.forEach(function(r) { beforeMap[r.rail] = r; });
+
+            var correctedNames = corrections.map(function(c) { return c.split(':')[0].trim(); });
+            correctedNames.forEach(function(railName) {
+                var b = beforeMap[railName];
+                var a = null;
+                afterRails.forEach(function(r) { if (r.rail === railName) a = r; });
+
+                if (b) {
+                    var bStatus = (b.thermal?.status === 'Pass' && b.ripple?.status === 'Pass' && b.derating?.status === 'Pass') ? 'Pass' : 'Fail';
+                    var aStatus = (a && a.thermal?.status === 'Pass' && a.ripple?.status === 'Pass' && a.derating?.status === 'Pass') ? 'Pass' : (a ? 'Fail' : 'N/A');
+                    var bComp = b.component || 'N/A';
+                    var aComp = a ? (a.component || 'N/A') : 'N/A';
+
+                    var bStatusColor = bStatus === 'Pass' ? '#10b981' : '#dc2626';
+                    var aStatusColor = aStatus === 'Pass' ? '#10b981' : '#dc2626';
+
+                    out += '<tr>'
+                         + '<td style="padding:0.6rem;border:1px solid #e2e8f0;font-weight:600;color:#1e293b;">' + railName + '</td>'
+                         + '<td style="padding:0.6rem;border:1px solid #e2e8f0;color:#64748b;">' + bComp + '</td>'
+                         + '<td style="padding:0.6rem;border:1px solid #e2e8f0;font-weight:600;color:#1d4ed8;">' + aComp + '</td>'
+                         + '<td style="padding:0.6rem;border:1px solid #e2e8f0;text-align:center;"><span style="color:' + bStatusColor + ';font-size:0.8rem;font-weight:600;">' + bStatus + '</span></td>'
+                         + '<td style="padding:0.6rem;border:1px solid #e2e8f0;text-align:center;"><span style="color:' + aStatusColor + ';font-size:0.8rem;font-weight:600;">' + aStatus + '</span></td>'
+                         + '</tr>';
+                }
+            });
+
+            out += '</tbody></table></div>';
+            return out;
+        }
+
         lastGeneratedData.schemes.forEach(function(s, i) {
             var railTableHtml  = buildReportRailTable(s.rail_analysis);
             var componentsHtml = buildReportComponents(s.selected_components);
             var mCode          = rawMermaidCodes[i] || '';
             var drcHtml        = buildReportDrc(s);
+            var beforeAfterHtml = buildReportBeforeAfter(s);
 
             schemesHtml += '<div class="scheme-block">'
                 + '<h2>' + (s.scheme_name || 'Scheme '+(i+1)) + ' <span class="price-badge">Total: INR ' + (s.total_price||0) + '</span></h2>'
                 + '<p class="freq-info"><strong>Switching Frequency:</strong> ' + (s.switching_frequency||'N/A') + '</p>'
                 + drcHtml
-                + '<div class="card"><h3>Schematics</h3><div style="overflow-x:auto;">' + (rawMermaidSVGs[i] || '<p style="color:#64748b;">No diagram available.</p>') + '</div></div>'
+                + beforeAfterHtml
+                + '<div class="card"><h3>Schematics (After Correction)</h3><div style="overflow-x:auto;">' + (rawMermaidSVGs[i] || '<p style="color:#64748b;">No diagram available.</p>') + '</div></div>'
                 + '<div class="card"><h3>Selected Components</h3>' + componentsHtml + '</div>'
-                + '<div class="card"><h3>Engineering Analysis — Per Rail</h3>' + railTableHtml + '</div>'
+                + '<div class="card"><h3>Engineering Analysis — Per Rail (After Correction)</h3>' + railTableHtml + '</div>'
                 + '</div>';
         });
 
