@@ -135,14 +135,20 @@ def filter_components(components: list, category: str = None, min_current: float
         cat = (c.get("category") or "").lower()
         if category and category.lower() not in cat:
             continue
+        # Include channels info for Buck converters
+        summary = c.get("summary", "")
+        channels = c.get("channels", 1)
+        if channels > 1:
+            summary = f"MULTI-OUTPUT ({channels} channels). " + summary
         filtered.append({
             "part_name": c["part_name"],
             "category":  c["category"],
             "price":     c["price"],
-            "summary":   c["summary"]
+            "summary":   summary,
+            "channels":  channels
         })
     return filtered if filtered else [{"part_name": c["part_name"], "category": c["category"],
-                                       "price": c["price"], "summary": c["summary"]} for c in components]
+                                       "price": c["price"], "summary": c.get("summary",""), "channels": c.get("channels",1)} for c in components]
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -165,11 +171,15 @@ AVAILABLE COMPONENTS (Bucks first, then LDOs):
 
 SELECTION RULES:
 1. Apply 1.5-1.75x current derating — selected component I_max must be >= 1.5 * I_load.
-2. Buck converters are SINGLE-OUTPUT. One Buck per voltage level.
-3. LDO input must come from an existing Buck output rail. Choose LDO with lowest dropout voltage.
-4. Provide EXACTLY 3 different scheme options. Vary topology: more Bucks vs more LDOs, high-efficiency vs low-cost vs best thermal.
-5. Include indirect load currents: if a Buck feeds LDOs, add all LDO load currents to the Buck's required current.
-6. RESPECT ANY USER-SPECIFIED CONSTRAINTS (e.g., "V7 must use LDO", "Use only ADI components", etc.) — these override default selection preferences.
+2. Most Buck converters are SINGLE-OUTPUT (one Buck per voltage level).
+3. MULTI-OUTPUT BUCKS available: LTM4671, LTM4675, LTM4676A have 2 channels each.
+   - Use multi-output Bucks when you have 2 rails with similar voltage requirements.
+   - Each channel can independently regulate different voltages.
+   - This reduces BOM cost and PCB area.
+4. LDO input must come from an existing Buck output rail. Choose LDO with lowest dropout voltage.
+5. Provide EXACTLY 3 different scheme options. Vary topology: more Bucks vs more LDOs, high-efficiency vs low-cost vs best thermal.
+6. Include indirect load currents: if a Buck feeds LDOs, add all LDO load currents to the Buck's required current.
+7. RESPECT ANY USER-SPECIFIED CONSTRAINTS (e.g., "V7 must use LDO", "Use only ADI components", etc.) — these override default selection preferences.
 
 Return ONLY valid JSON:
 {{
