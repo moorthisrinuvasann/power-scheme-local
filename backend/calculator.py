@@ -17,7 +17,7 @@ COMPONENT_SPECS = {
     "LTM4650":   {"type":"buck","vin_range":(4.5,20.0),"f_sw_hz":600e3,"l_uh":1.5,"c_out_uf":220, "rth_ja":4.0, "eta":0.93,"i_max":25.0,"esr_mohm":5, "channels":1},
     "LTM4650-1": {"type":"buck","vin_range":(4.5,20.0),"f_sw_hz":600e3,"l_uh":1.5,"c_out_uf":220, "rth_ja":4.0, "eta":0.93,"i_max":25.0,"esr_mohm":5, "channels":1},
     "LTM4655":   {"type":"buck","vin_range":(4.5,20.0),"f_sw_hz":1e6,  "l_uh":1.5,"c_out_uf":47,  "rth_ja":6.5, "eta":0.92,"i_max":15.0,"esr_mohm":8, "channels":1},
-    "LTM4671":   {"type":"buck","vin_range":(2.7,17.0),"f_sw_hz":1e6,  "l_uh":1.0,"c_out_uf":22,  "rth_ja":12.0,"eta":0.90,"i_max":4.0, "esr_mohm":12, "channels":2},  # Dual-output
+    "LTM4671":   {"type":"buck","vin_range":(3.1,20.0),"f_sw_hz":1e6,  "l_uh":1.0,"c_out_uf":22,  "rth_ja":12.0,"eta":0.90,"i_max":12.0,"esr_mohm":12, "channels":4},  # Quad-output (dual 12A + dual 5A)
     "LTM4675":   {"type":"buck","vin_range":(4.5,28.0),"f_sw_hz":800e3,"l_uh":1.5,"c_out_uf":100, "rth_ja":5.5, "eta":0.92,"i_max":13.0,"esr_mohm":7, "channels":2},  # Dual-output
     "LTM4676A":  {"type":"buck","vin_range":(4.5,28.0),"f_sw_hz":800e3,"l_uh":1.5,"c_out_uf":100, "rth_ja":5.5, "eta":0.92,"i_max":13.0,"esr_mohm":7, "channels":2},  # Dual-output
     "LTM4680":   {"type":"buck","vin_range":(4.5,20.0),"f_sw_hz":500e3,"l_uh":2.0,"c_out_uf":220, "rth_ja":4.5, "eta":0.93,"i_max":10.0,"esr_mohm":6, "channels":1},
@@ -51,8 +51,11 @@ def resolve_spec(name: str) -> dict:
     return {"type":"buck","f_sw_hz":1e6,"l_uh":1.5,"c_out_uf":47,"rth_ja":10.0,"eta":0.88,"i_max":10.0}
 
 
-def calc_buck_rail(v_in, v_out, i_out, spec, ta, req_ripple_mv, req_psrr_db):
-    """Real ripple + thermal calculation for a Buck rail."""
+def calc_buck_rail(v_in, v_out, i_out, spec, ta, req_ripple_mv, req_psrr_db, channels=1, channel_index=0):
+    """
+    Real ripple + thermal calculation for a Buck rail.
+    For multi-output Bucks: thermal is calculated based on TOTAL power across all channels.
+    """
     f   = spec["f_sw_hz"]
     L   = spec["l_uh"] * 1e-6
     C   = spec["c_out_uf"] * 1e-6
@@ -68,16 +71,17 @@ def calc_buck_rail(v_in, v_out, i_out, spec, ta, req_ripple_mv, req_psrr_db):
     dV_mv      = math.sqrt(dV_cap_mv**2 + dV_esr_mv**2)  # total (quadrature sum)
     rip_ok     = dV_mv <= req_ripple_mv
 
-    # Thermal
-    pdiss = (1 - eta) * v_out * i_out
-    tj    = ta + pdiss * rth
-    t_ok  = tj <= 125.0
+    # Thermal: for multi-output, each channel contributes to total power dissipation
+    # We'll store per-channel power for aggregation later
+    pdiss_channel = (1 - eta) * v_out * i_out
+    tj_per_watt   = ta + rth  # Tj per watt of total dissipation
 
     # PSRR: bucks have inherent line rejection from control loop ~40-60dB
     psrr_buck_db = 46  # typical for high-freq buck
     p_ok = psrr_buck_db >= req_psrr_db
 
     i_max   = spec["i_max"]
+    # For multi-output, each channel has its own current limit
     derating = i_max / i_out if i_out > 0 else 999
     d_ok     = derating >= 1.5
     d_warn   = 1.2 <= derating < 1.5
@@ -96,15 +100,18 @@ def calc_buck_rail(v_in, v_out, i_out, spec, ta, req_ripple_mv, req_psrr_db):
             "status": "Pass" if p_ok else "Fail"
         },
         "thermal": {
-            "calculation": f"P_diss=(1-{eta})*{v_out}V*{i_out}A={pdiss:.2f}W; Tj={ta}°C+{pdiss:.2f}W*{rth}°C/W={tj:.1f}°C",
-            "value": f"{tj:.1f} °C",
-            "status": "Pass" if t_ok else "Fail"
+            "calculation": f"P_diss(channel)={(1-eta)*v_out*i_out:.2f}W; (aggregate across {channels} channels for total Tj)",
+            "value": f"p_diss={pdiss_channel:.2f}W",  # Store per-channel dissipation
+            "status": "Pending"  # Will be updated after aggregation
         },
         "derating": {
             "calculation": f"I_max={i_max}A / I_load={i_out}A = {derating:.2f}x (required ≥1.5x, recommended ≥1.75x)",
             "value": f"{derating:.2f}x",
             "status": "Pass" if d_ok else ("Warn" if d_warn else "Fail")
-        }
+        },
+        "_pdiss_channel": pdiss_channel,  # Internal: per-channel power dissipation
+        "_tj_per_watt": tj_per_watt,      # Internal: Tj per watt for aggregation
+        "_channels": channels,             # Internal: number of channels
     }
 
 
@@ -164,6 +171,8 @@ def calculate_all_rails(rail_assignments: list, req: dict) -> list:
     """
     Main entry point. Takes LLM rail assignments and returns full rail_analysis
     with real Python-calculated values.
+
+    For multi-output Buck converters: thermal calculation aggregates power across all channels.
     """
     ta          = float(req.get("ta", 85))
     req_rip_mv  = float(req.get("ripple_mv", 15))
@@ -172,6 +181,7 @@ def calculate_all_rails(rail_assignments: list, req: dict) -> list:
     # First pass: calculate all buck rails and store ripple values
     buck_ripples = {}   # component_name -> ripple_mv for LDO upstream lookup
     buck_f_sw    = {}   # component_name -> f_sw_hz
+    comp_pdiss   = {}   # component_name -> total power dissipation (for multi-output thermal)
 
     for ra in rail_assignments:
         comp = ra.get("component", "")
@@ -180,12 +190,18 @@ def calculate_all_rails(rail_assignments: list, req: dict) -> list:
             v_in  = float(ra.get("v_in", 12))
             v_out = float(ra.get("v_out", 3.3))
             i_out = float(ra.get("i_out", 1))
-            res   = calc_buck_rail(v_in, v_out, i_out, spec, ta, req_rip_mv, req_psrr_db)
+            channels = ra.get("channels", 1)
+            channel_index = ra.get("channel_index", 0)
+            res   = calc_buck_rail(v_in, v_out, i_out, spec, ta, req_rip_mv, req_psrr_db, channels, channel_index)
             rip_v = float(res["ripple"]["value"].replace("mV","").strip())
             buck_ripples[comp] = rip_v
             buck_f_sw[comp]    = spec["f_sw_hz"]
+            # Aggregate power dissipation for multi-output Bucks
+            if comp not in comp_pdiss:
+                comp_pdiss[comp] = {"total_pdiss": 0, "rth": spec["rth_ja"], "ta": ta}
+            comp_pdiss[comp]["total_pdiss"] += res.get("_pdiss_channel", 0)
 
-    # Second pass: build full rail_analysis
+    # Second pass: build full rail_analysis with corrected thermal for multi-output
     result = []
     for ra in rail_assignments:
         comp      = ra.get("component", "")
@@ -194,9 +210,22 @@ def calculate_all_rails(rail_assignments: list, req: dict) -> list:
         v_out     = float(ra.get("v_out", 3.3))
         i_out     = float(ra.get("i_out", 1))
         spec      = resolve_spec(comp)
+        channels  = ra.get("channels", 1)
+        channel_index = ra.get("channel_index", 0)
 
         if spec["type"] == "buck":
-            calcs = calc_buck_rail(v_in, v_out, i_out, spec, ta, req_rip_mv, req_psrr_db)
+            calcs = calc_buck_rail(v_in, v_out, i_out, spec, ta, req_rip_mv, req_psrr_db, channels, channel_index)
+            # Update thermal for multi-output Bucks with aggregate calculation
+            if channels > 1 and comp in comp_pdiss:
+                total_pdiss = comp_pdiss[comp]["total_pdiss"]
+                rth = comp_pdiss[comp]["rth"]
+                ta_val = comp_pdiss[comp]["ta"]
+                tj = ta_val + total_pdiss * rth
+                calcs["thermal"] = {
+                    "calculation": f"P_diss(total)={total_pdiss:.2f}W ({channels} channels); Tj={ta_val}°C+{total_pdiss:.2f}W*{rth}°C/W={tj:.1f}°C",
+                    "value": f"{tj:.1f} °C",
+                    "status": "Pass" if tj <= 125.0 else "Fail"
+                }
         else:
             # LDO: find upstream buck ripple
             upstream = ra.get("upstream_component", "")

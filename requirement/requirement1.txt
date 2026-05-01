@@ -1,6 +1,6 @@
 Input Voltage : 12 V
 Output Voltages(V) : V1 = 3.3, V2 = 5, V3 = 0.85, V4 = 1.8, V5 = 1.2, V6 = 0.9, V7 = 1, V8 = 1.2
-Output Currents (A) : A1 = 6, A2 = 3.5, A3 = 0.5, A5 = 1, A6 = 40, A7 = 0.7, A8 = 0.8
+Output Currents (A) : A1 = 6, A2 = 3.5, A3 = 0.5, A5 = 1, A6 = 4, A7 = 0.7, A8 = 0.8
 Efficiency(%) : 90
 Ambient Temperature(degCel): 85
 PSRR : >35dB for input voltage switching frequency

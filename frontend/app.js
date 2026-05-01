@@ -329,47 +329,33 @@ function buildComparisonTable(comparison) {
 // ── DRC Panel builder ─────────────────────────────────────────────────────────
 function buildDrcPanel(scheme) {
     var violations = scheme.drc_violations || [];
-    var corrections = scheme.correction_log || [];
     var summary = scheme.drc_summary || '';
-    if (!violations.length && !corrections.length) {
+    if (!violations.length) {
         return '<div style="margin-bottom:1rem;padding:0.6rem 1rem;background:rgba(16,185,129,0.1);border:1px solid #10b981;border-radius:8px;font-size:0.85rem;color:#10b981;">✅ DRC: All design rules passed</div>';
     }
     var html = '<div style="margin-bottom:1.5rem;">';
 
     // DRC violations table
-    if (violations.length) {
-        html += '<div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.4);border-radius:10px;padding:1rem;margin-bottom:0.75rem;">'
-            + '<div style="font-weight:700;color:#f87171;margin-bottom:0.6rem;font-size:0.9rem;">⚠️ DRC Violations (' + violations.length + ')</div>'
-            + '<table style="width:100%;border-collapse:collapse;font-size:0.82rem;"><thead><tr>'
-            + '<th style="text-align:left;padding:0.4rem 0.6rem;color:#94a3b8;border-bottom:1px solid rgba(255,255,255,0.1);">Severity</th>'
-            + '<th style="text-align:left;padding:0.4rem 0.6rem;color:#94a3b8;border-bottom:1px solid rgba(255,255,255,0.1);">Rail</th>'
-            + '<th style="text-align:left;padding:0.4rem 0.6rem;color:#94a3b8;border-bottom:1px solid rgba(255,255,255,0.1);">Rule</th>'
-            + '<th style="text-align:left;padding:0.4rem 0.6rem;color:#94a3b8;border-bottom:1px solid rgba(255,255,255,0.1);">Detail</th>'
-            + '<th style="text-align:left;padding:0.4rem 0.6rem;color:#94a3b8;border-bottom:1px solid rgba(255,255,255,0.1);">Fix</th>'
-            + '</tr></thead><tbody>';
-        violations.forEach(function(v) {
-            var sevColor = v.severity === 'ERROR' ? '#f87171' : '#fbbf24';
-            html += '<tr>'
-                + '<td style="padding:0.4rem 0.6rem;"><span style="background:' + sevColor + ';color:#000;font-size:0.75rem;font-weight:700;padding:1px 6px;border-radius:4px;">' + v.severity + '</span></td>'
-                + '<td style="padding:0.4rem 0.6rem;color:#e2e8f0;font-weight:600;">' + v.rail + '</td>'
-                + '<td style="padding:0.4rem 0.6rem;color:#cbd5e1;">' + v.rule + '</td>'
-                + '<td style="padding:0.4rem 0.6rem;color:#94a3b8;font-size:0.8rem;">' + v.detail + '</td>'
-                + '<td style="padding:0.4rem 0.6rem;color:#60a5fa;font-size:0.8rem;">' + v.fix + '</td>'
-                + '</tr>';
-        });
-        html += '</tbody></table></div>';
-    }
-
-    // Correction log
-    if (corrections.length) {
-        html += '<div style="background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.3);border-radius:10px;padding:1rem;">'
-            + '<div style="font-weight:700;color:#818cf8;margin-bottom:0.5rem;font-size:0.9rem;">🔧 Auto-Corrections Applied (' + corrections.length + ')</div>';
-        corrections.forEach(function(c) {
-            html += '<div style="font-size:0.82rem;color:#94a3b8;padding:0.2rem 0;">✓ ' + c + '</div>';
-        });
-        html += '</div>';
-    }
-    html += '</div>';
+    html += '<div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.4);border-radius:10px;padding:1rem;">'
+        + '<div style="font-weight:700;color:#f87171;margin-bottom:0.6rem;font-size:0.9rem;">⚠️ DRC Violations (' + violations.length + ')</div>'
+        + '<table style="width:100%;border-collapse:collapse;font-size:0.82rem;"><thead><tr>'
+        + '<th style="text-align:left;padding:0.4rem 0.6rem;color:#94a3b8;border-bottom:1px solid rgba(255,255,255,0.1);">Severity</th>'
+        + '<th style="text-align:left;padding:0.4rem 0.6rem;color:#94a3b8;border-bottom:1px solid rgba(255,255,255,0.1);">Rail</th>'
+        + '<th style="text-align:left;padding:0.4rem 0.6rem;color:#94a3b8;border-bottom:1px solid rgba(255,255,255,0.1);">Rule</th>'
+        + '<th style="text-align:left;padding:0.4rem 0.6rem;color:#94a3b8;border-bottom:1px solid rgba(255,255,255,0.1);">Detail</th>'
+        + '<th style="text-align:left;padding:0.4rem 0.6rem;color:#94a3b8;border-bottom:1px solid rgba(255,255,255,0.1);">Fix</th>'
+        + '</tr></thead><tbody>';
+    violations.forEach(function(v) {
+        var sevColor = v.severity === 'ERROR' ? '#f87171' : '#fbbf24';
+        html += '<tr>'
+            + '<td style="padding:0.4rem 0.6rem;"><span style="background:' + sevColor + ';color:#000;font-size:0.75rem;font-weight:700;padding:1px 6px;border-radius:4px;">' + v.severity + '</span></td>'
+            + '<td style="padding:0.4rem 0.6rem;color:#e2e8f0;font-weight:600;">' + v.rail + '</td>'
+            + '<td style="padding:0.4rem 0.6rem;color:#cbd5e1;">' + v.rule + '</td>'
+            + '<td style="padding:0.4rem 0.6rem;color:#94a3b8;font-size:0.8rem;">' + v.detail + '</td>'
+            + '<td style="padding:0.4rem 0.6rem;color:#60a5fa;font-size:0.8rem;">' + v.fix + '</td>'
+            + '</tr>';
+    });
+    html += '</tbody></table></div></div>';
     return html;
 }
 
@@ -425,17 +411,27 @@ function buildFallbackMermaid(railAssignments) {
     var nodeMap = {};
     var railIdx = 1;
 
-    // First pass: count occurrences of each component
+    // First pass: group components and detect multi-output Bucks
     var compCount = {};
     var bucks = [];
     var ldos = [];
+    var multiOutputComps = {};  // comp -> {channels, rails: []}
 
     (railAssignments || []).forEach(function(ra) {
         var comp  = ra.component || 'IC';
         var ctype = (ra.comp_type || ra.component_type || '').toLowerCase();
+        var channels = ra.channels || 1;
+
         if (ctype === 'buck') {
             bucks.push(ra);
             compCount[comp] = (compCount[comp] || 0) + 1;
+            // Track multi-output Bucks
+            if (channels > 1) {
+                if (!multiOutputComps[comp]) {
+                    multiOutputComps[comp] = { channels: channels, rails: [], instance: 0 };
+                }
+                multiOutputComps[comp].rails.push(ra);
+            }
         } else if (ctype === 'ldo') {
             ldos.push(ra);
             compCount[comp] = (compCount[comp] || 0) + 1;
@@ -444,20 +440,61 @@ function buildFallbackMermaid(railAssignments) {
 
     // Build component -> instance counter mapping
     var compInstance = {};  // Track which instance number each rail gets
+    var multiOutputUsed = {};  // Track which multi-output comps have been drawn
 
-    // Draw Bucks - each instance gets its own numbered node
+    // Draw multi-output Bucks first - one node with multiple outputs
+    Object.keys(multiOutputComps).forEach(function(comp) {
+        var mData = multiOutputComps[comp];
+        var rails = mData.rails;
+        var channels = mData.channels;
+
+        // Skip if this comp was already handled (shouldn't happen, but safety)
+        if (multiOutputUsed[comp]) return;
+
+        compInstance[comp] = (compInstance[comp] || 0) + 1;
+        var instanceNum = compInstance[comp];
+        multiOutputUsed[comp] = true;
+
+        var nodeId = 'BUCK_' + railIdx;
+
+        // Build combined label: LTM4671-1\n2-Channel Buck\n3.3V/6A + 1.8V/0.5A
+        var outputs = rails.map(function(r) { return r.v_out + 'V/' + r.i_out + 'A'; });
+        var label = comp + '-' + instanceNum + '\\n' + channels + '-Channel Buck\\n' + outputs.join(' + ');
+
+        // Draw each channel output from the same component node
+        rails.forEach(function(ra, idx) {
+            var vout = ra.v_out || '?';
+            var iout = ra.i_out || '?';
+            var railName = ra.rail || 'Rail';
+
+            if (idx === 0) {
+                // First channel: draw component from VIN
+                lines.push('    VIN -->|"' + vout + 'V ' + iout + 'A"| ' + nodeId + '["' + label + '"]');
+            } else {
+                // Additional channels: just draw output edge
+                lines.push('    ' + nodeId + ' -->|"' + vout + 'V ' + iout + 'A"| V' + railIdx + '["V' + railIdx + ': ' + vout + 'V @ ' + iout + 'A"]');
+            }
+
+            nodeMap[railName] = nodeId;
+            railIdx++;
+        });
+    });
+
+    // Draw single-output Bucks
     bucks.forEach(function(ra) {
         var comp  = ra.component || 'IC';
         var rail  = ra.rail  || 'Rail';
         var vout  = ra.v_out  || '?';
         var iout  = ra.i_out  || '?';
+        var channels = ra.channels || 1;
 
-        // Track instance number for this component
+        // Skip if this is part of a multi-output group already drawn
+        if (multiOutputComps[comp] && multiOutputUsed[comp]) return;
+
         compInstance[comp] = (compInstance[comp] || 0) + 1;
         var instanceNum = compInstance[comp];
 
         var nodeId = 'BUCK_' + railIdx;
-        // Label format: LTM4638-1, LTM4638-2, etc.
         var label = comp + '-' + instanceNum + '\\nBuck ' + vout + 'V/' + iout + 'A';
         nodeMap[rail] = nodeId;
 
@@ -485,7 +522,6 @@ function buildFallbackMermaid(railAssignments) {
         var instanceNum = compInstance[comp];
 
         var nodeId = 'LDO_' + railIdx;
-        // Label format: TPS7A85A-1, TPS7A85A-2, etc.
         var label = comp + '-' + instanceNum + '\\nLDO ' + vout + 'V/' + iout + 'A';
         nodeMap[rail] = nodeId;
 
@@ -823,15 +859,7 @@ document.getElementById('downloadBtn').onclick = function() {
                 out += '<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:0.6rem 1rem;margin-bottom:0.75rem;color:#16a34a;font-weight:600;font-size:0.9rem;">✅ DRC: All design rules passed</div>';
             }
 
-            if (corrections.length) {
-                out += '<div style="background:#eff6ff;border:1px solid #93c5fd;border-radius:8px;padding:1rem;">'
-                    + '<div style="font-weight:700;color:#1d4ed8;margin-bottom:0.5rem;">🔧 Auto-Corrections Applied ('+corrections.length+')</div>';
-                corrections.forEach(function(c) {
-                    out += '<div style="font-size:0.85rem;color:#475569;padding:0.2rem 0;">✓ '+c+'</div>';
-                });
-                out += '</div>';
-            }
-            return out ? '<div class="card"><h3>DRC Validation &amp; Auto-Corrections</h3>'+out+'</div>' : '';
+            return out ? '<div class="card"><h3>DRC Validation</h3>'+out+'</div>' : '';
         }
 
         // ── Build Before/After Correction Panel for HTML Report ─────────────────

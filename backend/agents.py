@@ -170,12 +170,16 @@ AVAILABLE COMPONENTS (Bucks first, then LDOs):
 {comp_summary}
 
 SELECTION RULES:
-1. Apply 1.5-1.75x current derating — selected component I_max must be >= 1.5 * I_load.
-2. Most Buck converters are SINGLE-OUTPUT (one Buck per voltage level).
-3. MULTI-OUTPUT BUCKS available: LTM4671, LTM4675, LTM4676A have 2 channels each.
-   - Use multi-output Bucks when you have 2 rails with similar voltage requirements.
+1. Apply 1.5-1.75x current derating — selected component I_max must be >= 1.5 * I_load per channel.
+2. Most Buck converters are SINGLE-OUTPUT (one Buck per rail).
+3. MULTI-OUTPUT BUCKS available: LTM4671 has 4 channels (quad-output), LTM4675, LTM4676A have 2 channels each.
+   - CRITICAL: When using a multi-output Buck with N channels, assign ONE component to N rails.
+   - Example (2-channel): If V1 (3.3V) and V2 (1.8V) both need Bucks, use ONE LTM4671 for BOTH rails.
+   - Example (4-channel): If V1, V2, V3, V4 all need Bucks, use ONE LTM4671 for ALL FOUR rails.
+   - The component_selections should have ONE entry with "rails": ["V1", "V2", ...] for multi-output.
    - Each channel can independently regulate different voltages.
    - This reduces BOM cost and PCB area.
+   - Check the "channels" field in each component's summary for its output count.
 4. LDO input must come from an existing Buck output rail. Choose LDO with lowest dropout voltage.
 5. Provide EXACTLY 3 different scheme options. Vary topology: more Bucks vs more LDOs, high-efficiency vs low-cost vs best thermal.
 6. Include indirect load currents: if a Buck feeds LDOs, add all LDO load currents to the Buck's required current.
@@ -190,14 +194,26 @@ Return ONLY valid JSON:
       "total_price": 0.0,
       "component_selections": [
         {{
-          "rail": "V1 (3.3V @ 6A)",
-          "v_out": 3.3,
-          "i_out_load": 6.0,
-          "i_out_total": 6.0,
+          "rails": ["V1 (3.3V @ 6A)", "V2 (1.8V @ 4A)"],  // For multi-output: array of 2 rails
+          "v_out": [3.3, 1.8],  // Array of voltages for multi-output
+          "i_out_load": [6.0, 4.0],  // Array of loads for multi-output
+          "i_out_total": [6.0, 4.0],  // Array of total currents (include LDO loads)
+          "comp_type": "buck",
+          "component": "LTM4671",  // Multi-output Buck (2 channels)
+          "channels": 2,  // Number of channels used
+          "price": 0.0,
+          "reasoning": "LTM4671 dual-output Buck powers V1 and V2, reducing BOM cost."
+        }},
+        {{
+          "rail": "V3 (5V @ 2A)",  // For single-output: single rail string
+          "v_out": 5.0,
+          "i_out_load": 2.0,
+          "i_out_total": 2.0,
           "comp_type": "buck",
           "component": "LTM4638",
+          "channels": 1,
           "price": 0.0,
-          "reasoning": "Handles 6A with 1.75x derating (spec 10A). Best efficiency."
+          "reasoning": "Handles 2A with derating. Best efficiency."
         }}
       ]
     }}
@@ -234,8 +250,12 @@ TOPOLOGY RULES:
 3. The "upstream_component" for an LDO = the part_name of the Buck feeding it.
 4. Assign switching_frequency from datasheet: LTM4638=1MHz, LTM4622=1.5MHz, LTM4630=800kHz, LTM4650=600kHz, LTM4655=1MHz, LTM4671=1MHz, LTM4675=800kHz, LTM4680=500kHz, TPSM82866A=2.2MHz. Default=1MHz.
 5. LDOs have no switching frequency — use the upstream Buck's frequency.
-6. Generate a concise "final_summary" comparing all 3 schemes.
-7. RESPECT USER CONSTRAINTS from requirements (e.g., "V7 must use LDO") — do not override component choices made by Agent 1 based on constraints.
+6. For MULTI-OUTPUT Buck converters (channels > 1):
+   - Create ONE rail_assignment per OUTPUT channel, not per component.
+   - Each channel gets its own rail with v_in from the same source.
+   - The "component" field is the same for all channels of a multi-output Buck.
+7. Generate a concise "final_summary" comparing all 3 schemes.
+8. RESPECT USER CONSTRAINTS from requirements (e.g., "V7 must use LDO") — do not override component choices made by Agent 1 based on constraints.
 
 Return ONLY valid JSON:
 {{
@@ -250,17 +270,43 @@ Return ONLY valid JSON:
           "v_out": 3.3,
           "i_out": 6.0,
           "v_in": 12.0,
-          "component": "LTM4638",
+          "component": "LTM4671",
           "comp_type": "buck",
+          "channels": 2,
+          "channel_index": 0,
           "upstream_component": ""
         }},
         {{
           "rail": "V2 (1.8V @ 0.5A)",
           "v_out": 1.8,
           "i_out": 0.5,
+          "v_in": 12.0,
+          "component": "LTM4671",
+          "comp_type": "buck",
+          "channels": 2,
+          "channel_index": 1,
+          "upstream_component": ""
+        }},
+        {{
+          "rail": "V3 (5V @ 2A)",
+          "v_out": 5.0,
+          "i_out": 2.0,
+          "v_in": 12.0,
+          "component": "LTM4638",
+          "comp_type": "buck",
+          "channels": 1,
+          "channel_index": 0,
+          "upstream_component": ""
+        }},
+        {{
+          "rail": "V4 (1.2V @ 1A)",
+          "v_out": 1.2,
+          "i_out": 1.0,
           "v_in": 3.3,
           "component": "TPS7A85A",
           "comp_type": "ldo",
+          "channels": 1,
+          "channel_index": 0,
           "upstream_component": "LTM4638"
         }}
       ]
@@ -303,9 +349,12 @@ STRICT MERMAID SYNTAX RULES — violating any of these causes a blank diagram:
 9. **COMPONENT NUMBERING**: Each component instance gets its own numbered node:
    - If LTM4638 is used for V3 and V4: show as "LTM4638-1" and "LTM4638-2" (separate nodes)
    - If LTM4622 is used for V1: show as "LTM4622-1"
+   - **MULTI-OUTPUT BUCKS**: If LTM4671 (2 channels) powers V1 and V2:
+     - Show as ONE node: "LTM4671-1\\n2-Channel Buck" with both outputs branching from it
+     - The node shows all channel voltages: "3.3V/6A + 1.8V/0.5A"
    - Format: "PartName-1", "PartName-2", etc. for each instance
 
-VALID EXAMPLE:
+VALID EXAMPLE (single-output Bucks):
 graph TD
     VIN["VIN: 12V Input"] -->|"12V"| BUCK1["LTM4622-1\\nBuck 5V"]
     VIN -->|"12V"| BUCK2["LTM4638-1\\nBuck 3.3V"]
@@ -314,6 +363,14 @@ graph TD
     BUCK2 -->|"3.3V 6A"| V2["V2: 3.3V @ 6A"]
     BUCK3 -->|"1.8V 2A"| LDO1["TPS7A85A-1\\nLDO 1.2V"]
     LDO1 -->|"1.2V 1A"| V3["V3: 1.2V @ 1A"]
+
+VALID EXAMPLE (multi-output Buck):
+graph TD
+    VIN["VIN: 12V Input"] -->|"12V"| BUCK1["LTM4671-1\\n2-Channel Buck"]
+    VIN -->|"12V"| BUCK2["LTM4638-1\\nBuck 5V"]
+    BUCK1 -->|"3.3V 6A"| V1["V1: 3.3V @ 6A"]
+    BUCK1 -->|"1.8V 0.5A"| V2["V2: 1.8V @ 0.5A"]
+    BUCK2 -->|"5V 4A"| V3["V3: 5V @ 4A"]
 
 Return ONLY valid JSON (no markdown fences, no comments):
 {{

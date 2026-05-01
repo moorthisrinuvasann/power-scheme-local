@@ -52,42 +52,73 @@ def compute_metrics(scheme: dict) -> dict:
     analysis    = scheme.get("rail_analysis", [])
 
     # ── Component counts ──────────────────────────────────────────────────────
-    num_bucks = sum(1 for r in assignments if r.get("comp_type", "buck") == "buck")
-    num_ldos  = sum(1 for r in assignments if r.get("comp_type", "buck") == "ldo")
+    # Count physical components, accounting for multi-output parts
+    # Group rails by component and calculate how many physical packages are needed
+    from collections import defaultdict
+    comp_rail_count = defaultdict(int)  # component -> number of rails it powers
+
+    for r in assignments:
+        comp = r.get("component", "")
+        ctype = r.get("comp_type", "buck")
+        comp_rail_count[(comp, ctype)] += 1
+
+    num_bucks = 0
+    num_ldos = 0
+
+    for (comp, ctype), rail_count in comp_rail_count.items():
+        if ctype == "buck":
+            # Get the max channels this part supports
+            spec = resolve_spec(comp)
+            max_channels = spec.get("channels", 1)
+            # Calculate how many physical packages needed
+            num_packages = (rail_count + max_channels - 1) // max_channels  # ceiling division
+            num_bucks += num_packages
+        else:
+            # LDOs are always single-output
+            num_ldos += rail_count
+
     num_rails = len(assignments)
 
     # ── PCB area estimate ─────────────────────────────────────────────────────
     # IC footprints + 40% routing / decoupling margin + 5×5mm guard ring
-    ic_area = sum(_pkg_area(r.get("component",""), r.get("comp_type","buck"))
-                  for r in assignments)
+    # Count per physical component, not per rail
+    ic_area = 0
+    for (comp, ctype), rail_count in comp_rail_count.items():
+        if ctype == "buck":
+            spec = resolve_spec(comp)
+            max_channels = spec.get("channels", 1)
+            num_packages = (rail_count + max_channels - 1) // max_channels
+            ic_area += num_packages * _pkg_area(comp, ctype)
+        else:
+            ic_area += rail_count * _pkg_area(comp, ctype)
     pcb_area = round(ic_area * 1.4 + 25)   # mm²
 
     # ── Passive BOM count ─────────────────────────────────────────────────────
     total_caps       = 0
     total_inductors  = 0
 
-    for r in assignments:
-        comp  = r.get("component", "")
-        ctype = r.get("comp_type", "buck")
-        spec  = resolve_spec(comp)
+    for (comp, ctype), rail_count in comp_rail_count.items():
+        spec = resolve_spec(comp)
 
         if ctype == "buck":
+            max_channels = spec.get("channels", 1)
+            num_packages = (rail_count + max_channels - 1) // max_channels
             c_out_uf        = spec.get("c_out_uf", 47)
-            # Output caps: assume 22µF ceramic units
+            # Output caps: assume 22µF ceramic units per package
             n_out_caps      = max(2, round(c_out_uf / 22))
-            # Input caps: 2 bulk ceramics per buck
+            # Input caps: 2 bulk ceramics per buck package
             n_in_caps       = 2
-            total_caps      += n_out_caps + n_in_caps
+            total_caps      += num_packages * (n_out_caps + n_in_caps)
             # LTM µModules have integrated inductors — 0 external
             total_inductors += 0
         else:
             # LDO: 1 input + 1 output ceramic cap each
-            total_caps += 2
+            total_caps += rail_count * 2
 
     # Feedback resistors: 2 per rail
     total_resistors = num_rails * 2
 
-    # Bootstrap / enable / SS resistors: ~1 per buck
+    # Bootstrap / enable / SS resistors: ~1 per buck package
     total_resistors += num_bucks
 
     # ── Thermal extremes from calculator output ───────────────────────────────

@@ -24,37 +24,66 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], all
 def generate_mermaid_from_rails(rail_assignments: List[Dict[str, Any]]) -> str:
     """
     Generate a Mermaid flowchart from rail assignments.
-    Same logic as frontend's buildFallbackMermaid.
+    Handles multi-output Buck converters by grouping channels under one component node.
     """
     lines = ["graph TD"]
     lines.append('    VIN["VIN Input"]')
 
-    node_map: Dict[str, str] = {}
+    # First pass: group rails by component for multi-output support
+    comp_groups: Dict[str, List[Dict[str, Any]]] = {}
+    for ra in rail_assignments or []:
+        comp = ra.get("component", "IC")
+        if comp not in comp_groups:
+            comp_groups[comp] = []
+        comp_groups[comp].append(ra)
+
+    node_map: Dict[str, str] = {}  # rail_name -> node_id
+    comp_node_map: Dict[str, str] = {}  # component -> node_id
     node_idx = 0
 
+    # Second pass: create nodes
     for ra in rail_assignments or []:
         comp = re.sub(r'[^A-Za-z0-9]', '', ra.get("component", "IC"))
         rail = re.sub(r'[^A-Za-z0-9\s\.]', '', ra.get("rail", "Rail")).strip()
         vout = ra.get("v_out", "?")
         iout = ra.get("i_out", "?")
         ctype = (ra.get("comp_type", "") or "").lower()
+        channels = ra.get("channels", 1)
 
-        node_id = f"N{node_idx}"
+        # For multi-output Buck: create one node per component, not per rail
+        if comp not in comp_node_map:
+            comp_node_map[comp] = f"COMP{node_idx}"
+            node_idx += 1
+
+        node_id = comp_node_map[comp]
         node_map[ra.get("rail", "")] = node_id
-        node_idx += 1
 
-        label = f"{comp}\\\\n{vout}V/{iout}A"
+        # Build label based on component type and channels
+        if channels > 1 and ctype == "buck":
+            # Multi-output Buck: show all channel outputs
+            comp_data = comp_groups[comp]
+            outputs = [f"{r.get('v_out', '?')}V/{r.get('i_out', '?')}A" for r in comp_data]
+            label = f"{comp}\\\\n{channels}-Channel Buck\\\\n" + " + ".join(outputs)
+        else:
+            label = f"{comp}\\\\n{vout}V/{iout}A"
+
         upstream = ra.get("upstream_component", "")
         src = "VIN"
 
         # If LDO with upstream, find its node
         if ctype == "ldo" and upstream:
-            for k, v in node_map.items():
-                if k and upstream in k:
-                    src = v
+            # Find the node for the upstream component
+            for ra2 in rail_assignments or []:
+                if ra2.get("component") == upstream:
+                    src = comp_node_map.get(upstream, "VIN")
                     break
 
-        lines.append(f'    {src} -->|"{vout}V {iout}A"| {node_id}["{label}"]')
+        # For multi-output Buck, connect each channel output separately
+        if channels > 1 and ctype == "buck":
+            # One edge from component to each rail
+            lines.append(f'    {src} -->|"{vout}V {iout}A"| {node_id}["{label}"]')
+        else:
+            lines.append(f'    {src} -->|"{vout}V {iout}A"| {node_id}["{label}"]')
 
     if len(lines) == 2:
         lines.append('    VIN -->|"12V"| OUT["Output Rails"]')
