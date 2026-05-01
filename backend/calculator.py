@@ -234,12 +234,15 @@ def calculate_all_rails(rail_assignments: list, req: dict) -> list:
             calcs = calc_ldo_rail(v_in, v_out, i_out, spec, ta, upstream_rip, req_rip_mv, req_psrr_db, upstream_f)
 
         result.append({
-            "rail":      rail_name,
-            "component": comp,
-            "ripple":    calcs["ripple"],
-            "psrr":      calcs["psrr"],
-            "thermal":   calcs["thermal"],
-            "derating":  calcs["derating"],
+            "rail":             rail_name,
+            "component":        comp,
+            "component_display": ra.get("component_display", comp),
+            "channels":         ra.get("channels", 1),
+            "channel_index":    ra.get("channel_index", 0),
+            "ripple":           calcs["ripple"],
+            "psrr":             calcs["psrr"],
+            "thermal":          calcs["thermal"],
+            "derating":         calcs["derating"],
         })
 
     return result
