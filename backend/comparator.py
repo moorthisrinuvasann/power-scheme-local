@@ -84,26 +84,21 @@ def compute_metrics(scheme: dict) -> dict:
     total_caps       = 0
     total_inductors  = 0
 
-    for (comp, ctype), rail_count in comp_rail_count.items():
+    # Count caps per physical instance
+    for (comp, inst) in buck_instances:
         spec = resolve_spec(comp)
+        c_out_uf        = spec.get("c_out_uf", 47)
+        # Output caps: assume 22µF ceramic units per package
+        n_out_caps      = max(2, round(c_out_uf / 22))
+        # Input caps: 2 bulk ceramics per buck package
+        n_in_caps       = 2
+        total_caps      += (n_out_caps + n_in_caps)
+        # LTM µModules have integrated inductors — 0 external
+        total_inductors += 0
 
-        if ctype == "buck":
-            c_out_uf        = spec.get("c_out_uf", 47)
-            # Output caps: assume 22µF ceramic units per package
-            n_out_caps      = max(2, round(c_out_uf / 22))
-            # Input caps: 2 bulk ceramics per buck package
-            n_in_caps       = 2
-            # Count caps per physical instance
-            for (c, inst) in buck_instances:
-                if c == comp:
-                    total_caps += (n_out_caps + n_in_caps)
-            # LTM µModules have integrated inductors — 0 external
-            total_inductors += 0
-        else:
-            # LDO: 1 input + 1 output ceramic cap each
-            for (c, inst) in ldo_instances:
-                if c == comp:
-                    total_caps += 2
+    for (comp, inst) in ldo_instances:
+        # LDO: 1 input + 1 output ceramic cap each
+        total_caps += 2
 
     # Feedback resistors: 2 per rail
     total_resistors = num_rails * 2
