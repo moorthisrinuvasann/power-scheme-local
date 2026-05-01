@@ -205,6 +205,7 @@ async def generate_scheme(file: UploadFile = File(...), api_key: str = Form(...)
                 from collections import defaultdict
                 from backend.calculator import COMPONENT_SPECS
                 comp_instance_map: Dict[str, int] = {}  # (comp, type) -> current instance number
+                comp_channel_index: Dict[str, int] = {}  # (comp, type) -> next channel index (0-based)
 
                 for ra in rail_assignments:
                     comp = ra.get("component", "")
@@ -228,10 +229,13 @@ async def generate_scheme(file: UploadFile = File(...), api_key: str = Form(...)
                     key = (comp, ctype)
                     if key not in comp_instance_map:
                         comp_instance_map[key] = 1
+                        comp_channel_index[key] = 0  # Start channel index at 0 for new instance
                     ra["instance_num"] = comp_instance_map[key]
+                    ra["channel_index"] = comp_channel_index[key]  # Override LLM's channel_index
+                    comp_channel_index[key] += 1  # Increment for next rail with same component
                     ra["component_display"] = f"{comp}-{comp_instance_map[key]}"
 
-                    # Only increment instance number for single-output or last channel of multi-output
+                    # Only increment instance number for single-output
                     if channels == 1:
                         comp_instance_map[key] += 1
                     # For multi-output, all channels share the same instance number
