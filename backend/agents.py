@@ -24,7 +24,7 @@ HEADERS = {
 SYS_JSON = "You output strictly valid JSON only. No markdown fences, no comments, no trailing commas."
 
 
-async def _llm(client, prompt: str, max_tokens: int = 16000) -> str:
+async def _llm(client, prompt: str, max_tokens: int = 48000) -> str:
     """Single LLM call with 180s timeout, returns raw text."""
     try:
         resp = await asyncio.wait_for(
