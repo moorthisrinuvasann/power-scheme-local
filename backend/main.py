@@ -25,20 +25,23 @@ def generate_mermaid_from_rails(rail_assignments: List[Dict[str, Any]]) -> str:
     """
     Generate a Mermaid flowchart from rail assignments.
     Handles multi-output Buck converters by grouping channels under one component node.
+    Handles multiple instances of the same component (e.g., LTM4638-1, LTM4638-2).
     """
     lines = ["graph TD"]
     lines.append('    VIN["VIN Input"]')
 
-    # First pass: group rails by component for multi-output support
-    comp_groups: Dict[str, List[Dict[str, Any]]] = {}
+    # First pass: group rails by (component, instance_num) for proper node creation
+    comp_instance_groups: Dict[tuple, List[Dict[str, Any]]] = {}
     for ra in rail_assignments or []:
         comp = ra.get("component", "IC")
-        if comp not in comp_groups:
-            comp_groups[comp] = []
-        comp_groups[comp].append(ra)
+        instance_num = ra.get("instance_num", 1)
+        key = (comp, instance_num)
+        if key not in comp_instance_groups:
+            comp_instance_groups[key] = []
+        comp_instance_groups[key].append(ra)
 
     node_map: Dict[str, str] = {}  # rail_name -> node_id
-    comp_node_map: Dict[str, str] = {}  # component -> node_id
+    comp_instance_node_map: Dict[tuple, str] = {}  # (component, instance_num) -> node_id
     node_idx = 0
 
     # Second pass: create nodes
@@ -49,41 +52,41 @@ def generate_mermaid_from_rails(rail_assignments: List[Dict[str, Any]]) -> str:
         iout = ra.get("i_out", "?")
         ctype = (ra.get("comp_type", "") or "").lower()
         channels = ra.get("channels", 1)
+        instance_num = ra.get("instance_num", 1)
 
-        # For multi-output Buck: create one node per component, not per rail
-        if comp not in comp_node_map:
-            comp_node_map[comp] = f"COMP{node_idx}"
+        key = (comp, instance_num)
+
+        # Create one node per (component, instance) pair
+        if key not in comp_instance_node_map:
+            comp_instance_node_map[key] = f"COMP{node_idx}"
             node_idx += 1
 
-        node_id = comp_node_map[comp]
+        node_id = comp_instance_node_map[key]
         node_map[ra.get("rail", "")] = node_id
 
         # Build label based on component type and channels
         if channels > 1 and ctype == "buck":
-            # Multi-output Buck: show all channel outputs
-            comp_data = comp_groups[comp]
+            # Multi-output Buck: show all channel outputs for this instance
+            comp_data = comp_instance_groups[key]
             outputs = [f"{r.get('v_out', '?')}V/{r.get('i_out', '?')}A" for r in comp_data]
-            label = f"{comp}\\\\n{channels}-Channel Buck\\\\n" + " + ".join(outputs)
+            label = f"{comp}-{instance_num}\\\\n{len(comp_data)}-Channel Buck\\\\n" + " + ".join(outputs)
         else:
-            label = f"{comp}\\\\n{vout}V/{iout}A"
+            label = f"{comp}-{instance_num}\\\\n{vout}V/{iout}A"
 
         upstream = ra.get("upstream_component", "")
         src = "VIN"
 
         # If LDO with upstream, find its node
         if ctype == "ldo" and upstream:
-            # Find the node for the upstream component
+            # Find the node for the upstream component instance
             for ra2 in rail_assignments or []:
                 if ra2.get("component") == upstream:
-                    src = comp_node_map.get(upstream, "VIN")
+                    upstream_instance = ra2.get("instance_num", 1)
+                    src = comp_instance_node_map.get((upstream, upstream_instance), "VIN")
                     break
 
-        # For multi-output Buck, connect each channel output separately
-        if channels > 1 and ctype == "buck":
-            # One edge from component to each rail
-            lines.append(f'    {src} -->|"{vout}V {iout}A"| {node_id}["{label}"]')
-        else:
-            lines.append(f'    {src} -->|"{vout}V {iout}A"| {node_id}["{label}"]')
+        # Connect component to rail
+        lines.append(f'    {src} -->|"{vout}V {iout}A"| {node_id}["{label}"]')
 
     if len(lines) == 2:
         lines.append('    VIN -->|"12V"| OUT["Output Rails"]')
