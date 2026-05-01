@@ -203,12 +203,27 @@ async def generate_scheme(file: UploadFile = File(...), api_key: str = Form(...)
                 # Add instance numbers and channel info to rail assignments
                 # Group by component to assign instance numbers correctly
                 from collections import defaultdict
+                from backend.calculator import COMPONENT_SPECS
                 comp_instance_map: Dict[str, int] = {}  # (comp, type) -> current instance number
 
                 for ra in rail_assignments:
                     comp = ra.get("component", "")
                     ctype = ra.get("comp_type", "buck")
+
+                    # Look up channels from COMPONENT_SPECS if not provided
                     channels = ra.get("channels", 1)
+                    if channels == 1:
+                        # Try to get from COMPONENT_SPECS
+                        spec = COMPONENT_SPECS.get(comp, {})
+                        if not spec:
+                            # Fuzzy match
+                            for k, v in COMPONENT_SPECS.items():
+                                if k.upper().replace("-", "") == comp.upper().replace("-", ""):
+                                    spec = v
+                                    break
+                        if spec:
+                            channels = spec.get("channels", 1)
+                        ra["channels"] = channels
 
                     key = (comp, ctype)
                     if key not in comp_instance_map:
