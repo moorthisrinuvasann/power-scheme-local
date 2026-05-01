@@ -215,17 +215,25 @@ def calculate_all_rails(rail_assignments: list, req: dict) -> list:
 
         if spec["type"] == "buck":
             calcs = calc_buck_rail(v_in, v_out, i_out, spec, ta, req_rip_mv, req_psrr_db, channels, channel_index)
-            # Update thermal for multi-output Bucks with aggregate calculation
-            if channels > 1 and comp in comp_pdiss:
+            # Update thermal for Bucks with aggregate calculation
+            if comp in comp_pdiss:
                 total_pdiss = comp_pdiss[comp]["total_pdiss"]
                 rth = comp_pdiss[comp]["rth"]
                 ta_val = comp_pdiss[comp]["ta"]
                 tj = ta_val + total_pdiss * rth
-                calcs["thermal"] = {
-                    "calculation": f"P_diss(total)={total_pdiss:.2f}W ({channels} channels); Tj={ta_val}°C+{total_pdiss:.2f}W*{rth}°C/W={tj:.1f}°C",
-                    "value": f"{tj:.1f} °C",
-                    "status": "Pass" if tj <= 125.0 else "Fail"
-                }
+                if channels > 1:
+                    calcs["thermal"] = {
+                        "calculation": f"P_diss(total)={total_pdiss:.2f}W ({channels} channels); Tj={ta_val}°C+{total_pdiss:.2f}W*{rth}°C/W={tj:.1f}°C",
+                        "value": f"{tj:.1f} °C",
+                        "status": "Pass" if tj <= 125.0 else "Fail"
+                    }
+                else:
+                    # Single-output Buck: use per-channel dissipation
+                    calcs["thermal"] = {
+                        "calculation": f"P_diss={total_pdiss:.2f}W; Tj={ta_val}°C+{total_pdiss:.2f}W*{rth}°C/W={tj:.1f}°C",
+                        "value": f"{tj:.1f} °C",
+                        "status": "Pass" if tj <= 125.0 else "Fail"
+                    }
         else:
             # LDO: find upstream buck ripple
             upstream = ra.get("upstream_component", "")
