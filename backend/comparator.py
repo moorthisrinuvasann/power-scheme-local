@@ -52,45 +52,32 @@ def compute_metrics(scheme: dict) -> dict:
     analysis    = scheme.get("rail_analysis", [])
 
     # ── Component counts ──────────────────────────────────────────────────────
-    # Count physical components, accounting for multi-output parts
-    # Group rails by component and calculate how many physical packages are needed
-    from collections import defaultdict
-    comp_rail_count = defaultdict(int)  # component -> number of rails it powers
+    # Count physical components by unique (component, instance_num) pairs
+    buck_instances = set()  # (component, instance_num) for Bucks
+    ldo_instances = set()   # (component, instance_num) for LDOs
 
     for r in assignments:
         comp = r.get("component", "")
         ctype = r.get("comp_type", "buck")
-        comp_rail_count[(comp, ctype)] += 1
+        instance_num = r.get("instance_num", 1)
 
-    num_bucks = 0
-    num_ldos = 0
-
-    for (comp, ctype), rail_count in comp_rail_count.items():
         if ctype == "buck":
-            # Get the max channels this part supports
-            spec = resolve_spec(comp)
-            max_channels = spec.get("channels", 1)
-            # Calculate how many physical packages needed
-            num_packages = (rail_count + max_channels - 1) // max_channels  # ceiling division
-            num_bucks += num_packages
+            buck_instances.add((comp, instance_num))
         else:
-            # LDOs are always single-output
-            num_ldos += rail_count
+            ldo_instances.add((comp, instance_num))
 
+    num_bucks = len(buck_instances)
+    num_ldos = len(ldo_instances)
     num_rails = len(assignments)
 
     # ── PCB area estimate ─────────────────────────────────────────────────────
     # IC footprints + 40% routing / decoupling margin + 5×5mm guard ring
-    # Count per physical component, not per rail
+    # Count per physical component instance
     ic_area = 0
-    for (comp, ctype), rail_count in comp_rail_count.items():
-        if ctype == "buck":
-            spec = resolve_spec(comp)
-            max_channels = spec.get("channels", 1)
-            num_packages = (rail_count + max_channels - 1) // max_channels
-            ic_area += num_packages * _pkg_area(comp, ctype)
-        else:
-            ic_area += rail_count * _pkg_area(comp, ctype)
+    for (comp, instance_num) in buck_instances:
+        ic_area += _pkg_area(comp, "buck")
+    for (comp, instance_num) in ldo_instances:
+        ic_area += _pkg_area(comp, "ldo")
     pcb_area = round(ic_area * 1.4 + 25)   # mm²
 
     # ── Passive BOM count ─────────────────────────────────────────────────────
@@ -101,19 +88,22 @@ def compute_metrics(scheme: dict) -> dict:
         spec = resolve_spec(comp)
 
         if ctype == "buck":
-            max_channels = spec.get("channels", 1)
-            num_packages = (rail_count + max_channels - 1) // max_channels
             c_out_uf        = spec.get("c_out_uf", 47)
             # Output caps: assume 22µF ceramic units per package
             n_out_caps      = max(2, round(c_out_uf / 22))
             # Input caps: 2 bulk ceramics per buck package
             n_in_caps       = 2
-            total_caps      += num_packages * (n_out_caps + n_in_caps)
+            # Count caps per physical instance
+            for (c, inst) in buck_instances:
+                if c == comp:
+                    total_caps += (n_out_caps + n_in_caps)
             # LTM µModules have integrated inductors — 0 external
             total_inductors += 0
         else:
             # LDO: 1 input + 1 output ceramic cap each
-            total_caps += rail_count * 2
+            for (c, inst) in ldo_instances:
+                if c == comp:
+                    total_caps += 2
 
     # Feedback resistors: 2 per rail
     total_resistors = num_rails * 2
