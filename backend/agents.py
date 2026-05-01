@@ -104,9 +104,26 @@ def _extract_json(text: str):
             continue
 
     # Try finding the last valid JSON object by progressively truncating
+    # Start from the end and work backwards to find a valid parse point
+    # First, try larger steps to quickly find a valid closing point
+    end = len(text)
+    while end > start + 100:
+        end -= 100  # Large steps first
+        candidate = text[start:end]
+        # Close any open braces
+        open_braces = candidate.count('{') - candidate.count('}')
+        open_brackets = candidate.count('[') - candidate.count(']')
+        if open_braces >= 0 and open_brackets >= 0:
+            candidate += '}' * open_braces + ']' * open_brackets
+            try:
+                return json.loads(candidate)
+            except json.JSONDecodeError:
+                continue
+
+    # If large steps failed, try smaller steps for precision
     end = len(text)
     while end > start + 10:
-        end -= 50  # Step back in chunks
+        end -= 10  # Small steps for precision
         candidate = text[start:end]
         # Close any open braces
         open_braces = candidate.count('{') - candidate.count('}')
