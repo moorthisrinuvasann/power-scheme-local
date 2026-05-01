@@ -199,6 +199,28 @@ async def generate_scheme(file: UploadFile = File(...), api_key: str = Form(...)
                     scheme["total_price"] = 0.0
 
                 rail_assignments = scheme.get("rail_assignments", [])
+
+                # Add instance numbers and channel info to rail assignments
+                # Group by component to assign instance numbers correctly
+                from collections import defaultdict
+                comp_instance_map: Dict[str, int] = {}  # (comp, type) -> current instance number
+
+                for ra in rail_assignments:
+                    comp = ra.get("component", "")
+                    ctype = ra.get("comp_type", "buck")
+                    channels = ra.get("channels", 1)
+
+                    key = (comp, ctype)
+                    if key not in comp_instance_map:
+                        comp_instance_map[key] = 1
+                    ra["instance_num"] = comp_instance_map[key]
+                    ra["component_display"] = f"{comp}-{comp_instance_map[key]}"
+
+                    # Only increment instance number for single-output or last channel of multi-output
+                    if channels == 1:
+                        comp_instance_map[key] += 1
+                    # For multi-output, all channels share the same instance number
+
                 scheme["rail_analysis"] = calculate_all_rails(rail_assignments, req_params)
 
             # ── PHASE 3: Design Rule Check ─────────────────────────────────
@@ -242,6 +264,9 @@ async def generate_scheme(file: UploadFile = File(...), api_key: str = Form(...)
                                 key = _norm(cr.get("rail", ""))
                                 if key in rail_map:
                                     changes.append(f"{cr['rail']}: {cr.get('change_reason','replaced')}")
+                                    # Preserve instance number from original rail
+                                    cr["instance_num"] = rail_map[key].get("instance_num", 1)
+                                    cr["component_display"] = rail_map[key].get("component_display", cr.get("component", ""))
                                     rail_map[key] = cr
                             scheme["rail_assignments"] = list(rail_map.values())
                             scheme["correction_log"]   = changes
@@ -329,6 +354,26 @@ async def design_scheme(file: UploadFile = File(...), api_key: str = Form(...)):
             agent1_schemes = agent1.get("schemes", [])
             for i, scheme in enumerate(schemes):
                 scheme["schematics_mermaid"] = mermaid_codes[i] if i < len(mermaid_codes) else ""
+
+                # Add instance numbers and channel info to rail assignments
+                from collections import defaultdict
+                comp_instance_map: Dict[str, int] = {}
+
+                rail_assignments = scheme.get("rail_assignments", [])
+                for ra in rail_assignments:
+                    comp = ra.get("component", "")
+                    ctype = ra.get("comp_type", "buck")
+                    channels = ra.get("channels", 1)
+
+                    key = (comp, ctype)
+                    if key not in comp_instance_map:
+                        comp_instance_map[key] = 1
+                    ra["instance_num"] = comp_instance_map[key]
+                    ra["component_display"] = f"{comp}-{comp_instance_map[key]}"
+
+                    if channels == 1:
+                        comp_instance_map[key] += 1
+
                 if i < len(agent1_schemes):
                     a1 = agent1_schemes[i]
                     scheme["selected_components"] = [
@@ -381,6 +426,25 @@ async def analyze_scheme(request: Request):
 
             for scheme in schemes:
                 rail_assignments = scheme.get("rail_assignments", [])
+
+                # Add instance numbers and channel info to rail assignments
+                from collections import defaultdict
+                comp_instance_map: Dict[str, int] = {}
+
+                for ra in rail_assignments:
+                    comp = ra.get("component", "")
+                    ctype = ra.get("comp_type", "buck")
+                    channels = ra.get("channels", 1)
+
+                    key = (comp, ctype)
+                    if key not in comp_instance_map:
+                        comp_instance_map[key] = 1
+                    ra["instance_num"] = comp_instance_map[key]
+                    ra["component_display"] = f"{comp}-{comp_instance_map[key]}"
+
+                    if channels == 1:
+                        comp_instance_map[key] += 1
+
                 scheme["rail_analysis"] = calculate_all_rails(rail_assignments, req_params)
 
             yield sse_event("progress", {"step": 2, "total": 3,
@@ -420,9 +484,27 @@ async def analyze_scheme(request: Request):
                                 key = _norm(cr.get("rail", ""))
                                 if key in rail_map:
                                     changes.append(f"{cr['rail']}: {cr.get('change_reason','replaced')}")
+                                    # Preserve instance number from original rail
+                                    cr["instance_num"] = rail_map[key].get("instance_num", 1)
+                                    cr["component_display"] = rail_map[key].get("component_display", cr.get("component", ""))
                                     rail_map[key] = cr
                             scheme["rail_assignments"] = list(rail_map.values())
                             scheme["correction_log"]   = changes
+
+                            # Re-assign instance numbers after correction
+                            comp_instance_map: Dict[str, int] = {}
+                            for ra in scheme["rail_assignments"]:
+                                comp = ra.get("component", "")
+                                ctype = ra.get("comp_type", "buck")
+                                channels = ra.get("channels", 1)
+                                key = (comp, ctype)
+                                if key not in comp_instance_map:
+                                    comp_instance_map[key] = 1
+                                ra["instance_num"] = comp_instance_map[key]
+                                ra["component_display"] = f"{comp}-{comp_instance_map[key]}"
+                                if channels == 1:
+                                    comp_instance_map[key] += 1
+
                             scheme["rail_analysis"]    = calculate_all_rails(scheme["rail_assignments"], req_params)
                             new_v = run_drc(scheme["rail_assignments"], req_params)
                             scheme["drc_violations"]   = new_v

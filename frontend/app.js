@@ -170,7 +170,7 @@ function buildRailAnalysisTable(rails) {
         return '<p style="color:#f59e0b;padding:1rem;">&#9888; No rail analysis data returned by the AI. Check the browser console (F12) for the raw response.</p>';
     }
     var html = '<div style="overflow-x:auto;"><table class="thermal-table"><thead><tr>'
-        + '<th>Rail</th><th>Component</th><th>Analysis</th><th>Engineering Calculation</th><th>Result</th><th>Status</th>'
+        + '<th>Rail</th><th>Component</th><th>Instance</th><th>Channel</th><th>Analysis</th><th>Engineering Calculation</th><th>Result</th><th>Status</th>'
         + '</tr></thead><tbody>';
 
     rails.forEach(function(r) {
@@ -187,9 +187,19 @@ function buildRailAnalysisTable(rails) {
             return 'status-fail';
         }
 
+        // Build component display with instance number
+        var componentDisplay = r.component_display || r.component || 'N/A';
+
+        // Build channel info for multi-output Bucks
+        var channels = r.channels || 1;
+        var channelIndex = r.channel_index !== undefined ? r.channel_index : 0;
+        var channelDisplay = channels > 1 ? 'CH' + (channelIndex + 1) : '-';
+
         html += '<tr>'
             + '<td rowspan="4" style="font-weight:700;vertical-align:top;border-right:2px solid rgba(99,102,241,0.3);min-width:90px;">' + (r.rail || 'N/A') + '</td>'
-            + '<td rowspan="4" style="vertical-align:top;border-right:2px solid rgba(99,102,241,0.3);font-size:0.85rem;min-width:120px;">' + (r.component || 'N/A') + '</td>'
+            + '<td rowspan="4" style="vertical-align:top;border-right:2px solid rgba(99,102,241,0.3);font-size:0.85rem;min-width:100px;">' + componentDisplay + '</td>'
+            + '<td rowspan="4" style="vertical-align:top;border-right:2px solid rgba(99,102,241,0.3);font-size:0.85rem;min-width:60px;text-align:center;">' + (r.instance_num !== undefined ? '#' + r.instance_num : '-') + '</td>'
+            + '<td rowspan="4" style="vertical-align:top;border-right:2px solid rgba(99,102,241,0.3);font-size:0.85rem;min-width:60px;text-align:center;">' + channelDisplay + '</td>'
             + '<td style="font-weight:600;color:#60a5fa;">Voltage Ripple</td>'
             + '<td style="font-size:0.82rem;color:#94a3b8;">' + safeRipple.calculation + '</td>'
             + '<td style="font-weight:700;">' + safeRipple.value + '</td>'
@@ -613,6 +623,8 @@ function buildReportRailTable(rails) {
         + '<thead><tr style="background:#1e3a5f;color:white;">'
         + '<th style="padding:0.6rem 0.8rem;text-align:left;border:1px solid #cbd5e1;">Rail</th>'
         + '<th style="padding:0.6rem 0.8rem;text-align:left;border:1px solid #cbd5e1;">Component</th>'
+        + '<th style="padding:0.6rem 0.8rem;text-align:center;border:1px solid #cbd5e1;">Instance</th>'
+        + '<th style="padding:0.6rem 0.8rem;text-align:center;border:1px solid #cbd5e1;">Channel</th>'
         + '<th style="padding:0.6rem 0.8rem;text-align:left;border:1px solid #cbd5e1;">Analysis</th>'
         + '<th style="padding:0.6rem 0.8rem;text-align:left;border:1px solid #cbd5e1;">Engineering Calculation</th>'
         + '<th style="padding:0.6rem 0.8rem;text-align:left;border:1px solid #cbd5e1;">Result</th>'
@@ -637,12 +649,22 @@ function buildReportRailTable(rails) {
             return '<span style="background:' + sColor(s) + ';color:white;padding:2px 8px;border-radius:999px;font-size:0.8rem;font-weight:bold;">' + (s || '—') + '</span>';
         }
 
+        // Build component display with instance number
+        var componentDisplay = r.component_display || r.component || 'N/A';
+
+        // Build channel info for multi-output Bucks
+        var channels = r.channels || 1;
+        var channelIndex = r.channel_index !== undefined ? r.channel_index : 0;
+        var channelDisplay = channels > 1 ? 'CH' + (channelIndex + 1) : '-';
+
         var td = 'style="padding:0.6rem 0.8rem;border:1px solid #e2e8f0;vertical-align:top;"';
-        var tdCenter = 'style="padding:0.6rem 0.8rem;border:1px solid #e2e8f0;vertical-align:middle;background:' + bg + ';"';
+        var tdCenter = 'style="padding:0.6rem 0.8rem;border:1px solid #e2e8f0;vertical-align:middle;background:' + bg + ';text-align:center;"';
 
         html += '<tr style="background:' + bg + ';">'
             + '<td ' + td + ' rowspan="4" style="padding:0.6rem 0.8rem;border:1px solid #e2e8f0;vertical-align:middle;font-weight:700;min-width:80px;background:#eff6ff;border-left:4px solid #3b82f6;">' + (r.rail || 'N/A') + '</td>'
-            + '<td ' + td + ' rowspan="4" style="padding:0.6rem 0.8rem;border:1px solid #e2e8f0;vertical-align:middle;font-size:0.82rem;background:#eff6ff;">' + (r.component || 'N/A') + '</td>'
+            + '<td ' + td + ' rowspan="4" style="padding:0.6rem 0.8rem;border:1px solid #e2e8f0;vertical-align:middle;font-size:0.82rem;background:#eff6ff;">' + componentDisplay + '</td>'
+            + '<td ' + tdCenter + ' rowspan="4" style="padding:0.6rem 0.8rem;border:1px solid #e2e8f0;vertical-align:middle;font-size:0.82rem;background:#eff6ff;min-width:60px;">' + (r.instance_num !== undefined ? '#' + r.instance_num : '-') + '</td>'
+            + '<td ' + tdCenter + ' rowspan="4" style="padding:0.6rem 0.8rem;border:1px solid #e2e8f0;vertical-align:middle;font-size:0.82rem;background:#eff6ff;min-width:60px;">' + channelDisplay + '</td>'
             + '<td style="padding:0.6rem 0.8rem;border:1px solid #e2e8f0;background:#dbeafe;font-weight:600;color:#1d4ed8;">Voltage Ripple</td>'
             + '<td style="padding:0.6rem 0.8rem;border:1px solid #e2e8f0;font-size:0.82rem;color:#475569;font-family:monospace;">' + safeRipple.calculation + '</td>'
             + '<td style="padding:0.6rem 0.8rem;border:1px solid #e2e8f0;font-weight:700;">' + safeRipple.value + '</td>'
