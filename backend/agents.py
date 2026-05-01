@@ -135,6 +135,21 @@ def _extract_json(text: str):
             except json.JSONDecodeError:
                 continue
 
+    # Final fallback: find the last complete } or ] by scanning backwards
+    # Look for pattern like "}}" or "]]" or "}," or "]," which indicate complete objects/arrays
+    for i in range(len(text) - 2, start, -1):
+        if text[i:i+2] in ['}]', ']}', '},', '],']:
+            candidate = text[start:i+1]
+            # Try to parse with minimal closing
+            open_braces = candidate.count('{') - candidate.count('}')
+            open_brackets = candidate.count('[') - candidate.count(']')
+            if open_braces >= 0 and open_brackets >= 0:
+                candidate += '}' * open_braces + ']' * open_brackets
+                try:
+                    return json.loads(candidate)
+                except json.JSONDecodeError:
+                    continue
+
     print(f"[WARN] _extract_json failed. Raw response (first 500 chars):\n{original[:500]}")
     print(f"[WARN] Response length: {len(original)} chars")
     raise ValueError(f"LLM returned non-JSON. Response preview: {original[:200]}")
