@@ -505,7 +505,7 @@ function buildFallbackMermaid(railAssignments) {
         var instanceNum = compInstance[comp];
 
         var nodeId = 'BUCK_' + railIdx;
-        var label = comp + '-' + instanceNum + '\\nBuck ' + vout + 'V/' + iout + 'A';
+        var label = comp + '-' + instanceNum + '\\nBuck\\\\n' + vout + 'V/' + iout + 'A';
         nodeMap[rail] = nodeId;
 
         lines.push('    VIN -->|"' + vout + 'V ' + iout + 'A"| ' + nodeId + '["' + label + '"]');
@@ -526,7 +526,7 @@ function buildFallbackMermaid(railAssignments) {
         var instanceNum = ra.instance_num || 1;  // Use instance_num from backend
 
         var nodeId = 'LDO_' + railIdx;
-        var label = comp + '-' + instanceNum + '\\nLDO ' + vout + 'V/' + iout + 'A';
+        var label = comp + '-' + instanceNum + '\\nLDO\\\\n' + vout + 'V/' + iout + 'A';
         nodeMap[rail] = nodeId;
 
         // Find upstream buck node by matching upstream component name

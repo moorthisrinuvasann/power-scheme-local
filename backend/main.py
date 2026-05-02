@@ -70,8 +70,12 @@ def generate_mermaid_from_rails(rail_assignments: List[Dict[str, Any]]) -> str:
             comp_data = comp_instance_groups[key]
             outputs = [f"{r.get('v_out', '?')}V/{r.get('i_out', '?')}A" for r in comp_data]
             label = f"{comp}-{instance_num}\\\\n{len(comp_data)}-Channel Buck\\\\n" + " + ".join(outputs)
+        elif ctype == "buck":
+            # Single-output Buck
+            label = f"{comp}-{instance_num}\\\\nBuck\\\\n{vout}V/{iout}A"
         else:
-            label = f"{comp}-{instance_num}\\\\n{vout}V/{iout}A"
+            # LDO
+            label = f"{comp}-{instance_num}\\\\nLDO\\\\n{vout}V/{iout}A"
 
         upstream = ra.get("upstream_component", "")
         src = "VIN"
