@@ -78,12 +78,15 @@ def generate_mermaid_from_rails(rail_assignments: List[Dict[str, Any]]) -> str:
 
         # If LDO with upstream, find its node
         if ctype == "ldo" and upstream:
-            # Find the node for the upstream component instance
+            # Find the instance of the upstream component
+            # Look for the first rail with the matching upstream component name
             for ra2 in rail_assignments or []:
                 if ra2.get("component") == upstream:
                     upstream_instance = ra2.get("instance_num", 1)
-                    src = comp_instance_node_map.get((upstream, upstream_instance), "VIN")
-                    break
+                    upstream_key = (upstream, upstream_instance)
+                    if upstream_key in comp_instance_node_map:
+                        src = comp_instance_node_map[upstream_key]
+                        break
 
         # Connect component to rail
         lines.append(f'    {src} -->|"{vout}V {iout}A"| {node_id}["{label}"]')
@@ -214,19 +217,18 @@ async def generate_scheme(file: UploadFile = File(...), api_key: str = Form(...)
                     comp = ra.get("component", "")
                     ctype = ra.get("comp_type", "buck")
 
-                    # Look up channels from COMPONENT_SPECS if not provided
+                    # Look up channels from COMPONENT_SPECS for both Buck and LDO
                     channels = ra.get("channels", 1)
-                    if channels == 1:
-                        # Try to get from COMPONENT_SPECS
-                        spec = COMPONENT_SPECS.get(comp, {})
-                        if not spec:
-                            # Fuzzy match
-                            for k, v in COMPONENT_SPECS.items():
-                                if k.upper().replace("-", "") == comp.upper().replace("-", ""):
-                                    spec = v
-                                    break
-                        if spec:
-                            channels = spec.get("channels", 1)
+                    # Try to get from COMPONENT_SPECS
+                    spec = COMPONENT_SPECS.get(comp, {})
+                    if not spec:
+                        # Fuzzy match
+                        for k, v in COMPONENT_SPECS.items():
+                            if k.upper().replace("-", "") == comp.upper().replace("-", ""):
+                                spec = v
+                                break
+                    if spec:
+                        channels = spec.get("channels", 1)
                         ra["channels"] = channels
 
                     key = (comp, ctype)
@@ -386,6 +388,11 @@ async def design_scheme(file: UploadFile = File(...), api_key: str = Form(...)):
                     comp = ra.get("component", "")
                     ctype = ra.get("comp_type", "buck")
                     channels = ra.get("channels", 1)
+                    # Look up channels from COMPONENT_SPECS
+                    spec = COMPONENT_SPECS.get(comp, {})
+                    if spec:
+                        channels = spec.get("channels", 1)
+                        ra["channels"] = channels
 
                     key = (comp, ctype)
                     if key not in comp_instance_map:
@@ -457,6 +464,11 @@ async def analyze_scheme(request: Request):
                     comp = ra.get("component", "")
                     ctype = ra.get("comp_type", "buck")
                     channels = ra.get("channels", 1)
+                    # Look up channels from COMPONENT_SPECS
+                    spec = COMPONENT_SPECS.get(comp, {})
+                    if spec:
+                        channels = spec.get("channels", 1)
+                        ra["channels"] = channels
 
                     key = (comp, ctype)
                     if key not in comp_instance_map:
@@ -519,6 +531,11 @@ async def analyze_scheme(request: Request):
                                 comp = ra.get("component", "")
                                 ctype = ra.get("comp_type", "buck")
                                 channels = ra.get("channels", 1)
+                                # Look up channels from COMPONENT_SPECS
+                                spec = COMPONENT_SPECS.get(comp, {})
+                                if spec:
+                                    channels = spec.get("channels", 1)
+                                    ra["channels"] = channels
                                 key = (comp, ctype)
                                 if key not in comp_instance_map:
                                     comp_instance_map[key] = 1

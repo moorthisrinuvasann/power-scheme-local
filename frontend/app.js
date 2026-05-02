@@ -516,26 +516,20 @@ function buildFallbackMermaid(railAssignments) {
         railIdx++;
     });
 
-    // Reset counter for LDOs
-    compInstance = {};
-
-    // Draw LDOs - each instance gets its own numbered node
+    // Draw LDOs - use instance_num from rail assignment if available
     ldos.forEach(function(ra) {
         var comp  = ra.component || 'IC';
         var rail  = ra.rail  || 'Rail';
         var vout  = ra.v_out  || '?';
         var iout  = ra.i_out  || '?';
         var upstream = ra.upstream_component || '';
-
-        // Track instance number for this component
-        compInstance[comp] = (compInstance[comp] || 0) + 1;
-        var instanceNum = compInstance[comp];
+        var instanceNum = ra.instance_num || 1;  // Use instance_num from backend
 
         var nodeId = 'LDO_' + railIdx;
         var label = comp + '-' + instanceNum + '\\nLDO ' + vout + 'V/' + iout + 'A';
         nodeMap[rail] = nodeId;
 
-        // Find upstream buck node
+        // Find upstream buck node by matching upstream component name
         var src = 'VIN';
         for (var k in nodeMap) {
             if (k && upstream && k.indexOf(upstream) !== -1) { src = nodeMap[k]; break; }

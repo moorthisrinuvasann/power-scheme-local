@@ -197,12 +197,23 @@ def main():
         for pdf_file in sorted(category_dir.glob('*.pdf')):
             part_name = pdf_file.stem.upper()
 
-            # Find matching spec (case-insensitive)
+            # Find matching spec (case-insensitive) - prefer exact matches first
             spec = None
+            spec_name_found = None
             for spec_name, spec_data in COMPONENT_SPECS.items():
-                if spec_name.upper() == part_name or part_name in spec_name.upper() or spec_name.upper() in part_name:
+                if spec_name.upper() == part_name:
+                    # Exact match - use this one
                     spec = spec_data
+                    spec_name_found = spec_name
                     break
+
+            # If no exact match, try fuzzy matching
+            if spec is None:
+                for spec_name, spec_data in COMPONENT_SPECS.items():
+                    if part_name in spec_name.upper() or spec_name.upper() in part_name:
+                        spec = spec_data
+                        spec_name_found = spec_name
+                        break
 
             if spec is None:
                 print(f"[WARNING] No spec found for {part_name} ({pdf_file.name})")

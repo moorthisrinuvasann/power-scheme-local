@@ -10,28 +10,28 @@ import math
 COMPONENT_SPECS = {
     # Buck Converters           vin_range      f_sw      L      C_out  Rθja   η     I_max  ESR  channels
     "LTM4638":   {"type":"buck","vin_range":(4.5,20.0),"f_sw_hz":1e6,  "l_uh":1.5,"c_out_uf":47,  "rth_ja":8.0, "eta":0.91,"i_max":10.0,"esr_mohm":8, "channels":1},
-    "LTM4622":   {"type":"buck","vin_range":(2.7,17.0),"f_sw_hz":1.5e6,"l_uh":1.0,"c_out_uf":22,  "rth_ja":10.0,"eta":0.90,"i_max":4.0, "esr_mohm":12, "channels":1},
-    "LTM4622IV": {"type":"buck","vin_range":(2.7,17.0),"f_sw_hz":1.5e6,"l_uh":1.0,"c_out_uf":22,  "rth_ja":10.0,"eta":0.90,"i_max":4.0, "esr_mohm":12, "channels":1},
-    "LTM4630":   {"type":"buck","vin_range":(4.5,28.0),"f_sw_hz":800e3,"l_uh":1.5,"c_out_uf":100, "rth_ja":5.0, "eta":0.93,"i_max":15.0,"esr_mohm":6, "channels":1},
-    "LTM4630A":  {"type":"buck","vin_range":(4.5,28.0),"f_sw_hz":800e3,"l_uh":1.5,"c_out_uf":100, "rth_ja":5.0, "eta":0.93,"i_max":15.0,"esr_mohm":6, "channels":1},
+    "LTM4622":   {"type":"buck","vin_range":(3.6,17.0),"f_sw_hz":1.5e6,"l_uh":1.0,"c_out_uf":22,  "rth_ja":10.0,"eta":0.90,"i_max":4.0, "esr_mohm":12, "channels":1},
+    "LTM4622IV": {"type":"buck","vin_range":(3.6,17.0),"f_sw_hz":1.5e6,"l_uh":1.0,"c_out_uf":22,  "rth_ja":10.0,"eta":0.90,"i_max":4.0, "esr_mohm":12, "channels":1},
+    "LTM4630":   {"type":"buck","vin_range":(4.5,15.0),"f_sw_hz":800e3,"l_uh":1.5,"c_out_uf":100, "rth_ja":5.0, "eta":0.93,"i_max":15.0,"esr_mohm":6, "channels":1},
+    "LTM4630A":  {"type":"buck","vin_range":(4.5,15.0),"f_sw_hz":800e3,"l_uh":1.5,"c_out_uf":100, "rth_ja":5.0, "eta":0.93,"i_max":15.0,"esr_mohm":6, "channels":1},
     "LTM4650":   {"type":"buck","vin_range":(4.5,20.0),"f_sw_hz":600e3,"l_uh":1.5,"c_out_uf":220, "rth_ja":4.0, "eta":0.93,"i_max":25.0,"esr_mohm":5, "channels":1},
-    "LTM4650-1": {"type":"buck","vin_range":(4.5,20.0),"f_sw_hz":600e3,"l_uh":1.5,"c_out_uf":220, "rth_ja":4.0, "eta":0.93,"i_max":25.0,"esr_mohm":5, "channels":1},
+    "LTM4650-1": {"type":"buck","vin_range":(4.5,15.0),"f_sw_hz":600e3,"l_uh":1.5,"c_out_uf":220, "rth_ja":4.0, "eta":0.93,"i_max":25.0,"esr_mohm":5, "channels":1},
     "LTM4655":   {"type":"buck","vin_range":(4.5,20.0),"f_sw_hz":1e6,  "l_uh":1.5,"c_out_uf":47,  "rth_ja":6.5, "eta":0.92,"i_max":15.0,"esr_mohm":8, "channels":1},
-    "LTM4671":   {"type":"buck","vin_range":(3.1,20.0),"f_sw_hz":1e6,  "l_uh":1.0,"c_out_uf":22,  "rth_ja":12.0,"eta":0.90,"i_max":12.0,"esr_mohm":12, "channels":4},  # Quad-output (dual 12A + dual 5A)
-    "LTM4675":   {"type":"buck","vin_range":(4.5,28.0),"f_sw_hz":800e3,"l_uh":1.5,"c_out_uf":100, "rth_ja":5.5, "eta":0.92,"i_max":13.0,"esr_mohm":7, "channels":2},  # Dual-output
-    "LTM4676A":  {"type":"buck","vin_range":(4.5,28.0),"f_sw_hz":800e3,"l_uh":1.5,"c_out_uf":100, "rth_ja":5.5, "eta":0.92,"i_max":13.0,"esr_mohm":7, "channels":2},  # Dual-output
-    "LTM4680":   {"type":"buck","vin_range":(4.5,20.0),"f_sw_hz":500e3,"l_uh":2.0,"c_out_uf":220, "rth_ja":4.5, "eta":0.93,"i_max":10.0,"esr_mohm":6, "channels":1},
-    "LTM4700":   {"type":"buck","vin_range":(4.5,60.0),"f_sw_hz":400e3,"l_uh":2.5,"c_out_uf":470, "rth_ja":2.5, "eta":0.94,"i_max":50.0,"esr_mohm":3, "channels":1},
-    "LTM4705":   {"type":"buck","vin_range":(4.5,60.0),"f_sw_hz":300e3,"l_uh":3.0,"c_out_uf":680, "rth_ja":2.0, "eta":0.95,"i_max":40.0,"esr_mohm":3, "channels":1},
-    "TPSM82866A":{"type":"buck","vin_range":(2.7,17.0),"f_sw_hz":2.2e6,"l_uh":0.47,"c_out_uf":22, "rth_ja":20.0,"eta":0.88,"i_max":6.0, "esr_mohm":15, "channels":1},
+    "LTM4671":   {"type":"buck","vin_range":(5.0,20.0),"f_sw_hz":1e6,  "l_uh":1.0,"c_out_uf":22,  "rth_ja":12.0,"eta":0.90,"i_max":12.0,"esr_mohm":12, "channels":4},  # Quad-output (dual 12A + dual 5A)
+    "LTM4675":   {"type":"buck","vin_range":(5.75,17.0),"f_sw_hz":800e3,"l_uh":1.5,"c_out_uf":100, "rth_ja":5.5, "eta":0.92,"i_max":13.0,"esr_mohm":7, "channels":2},  # Dual-output
+    "LTM4676A":  {"type":"buck","vin_range":(5.75,26.5),"f_sw_hz":800e3,"l_uh":1.5,"c_out_uf":100, "rth_ja":5.5, "eta":0.92,"i_max":13.0,"esr_mohm":7, "channels":2},  # Dual-output
+    "LTM4680":   {"type":"buck","vin_range":(4.5,16.0),"f_sw_hz":500e3,"l_uh":2.0,"c_out_uf":220, "rth_ja":4.5, "eta":0.93,"i_max":10.0,"esr_mohm":6, "channels":1},
+    "LTM4700":   {"type":"buck","vin_range":(5.75,16.0),"f_sw_hz":400e3,"l_uh":2.5,"c_out_uf":470, "rth_ja":2.5, "eta":0.94,"i_max":50.0,"esr_mohm":3, "channels":1},
+    "LTM4705":   {"type":"buck","vin_range":(4.5,20.0),"f_sw_hz":300e3,"l_uh":3.0,"c_out_uf":680, "rth_ja":2.0, "eta":0.95,"i_max":40.0,"esr_mohm":3, "channels":1},
+    "TPSM82866A":{"type":"buck","vin_range":(2.7,5.5),"f_sw_hz":2.2e6,"l_uh":0.47,"c_out_uf":22, "rth_ja":20.0,"eta":0.88,"i_max":6.0, "esr_mohm":15, "channels":1},
     "LTM8067FC": {"type":"buck","vin_range":(3.1,40.0),"f_sw_hz":1e6,  "l_uh":1.5,"c_out_uf":47,  "rth_ja":10.0,"eta":0.88,"i_max":0.6, "esr_mohm":10, "channels":1},
-    # LDO Regulators              rth    100Hz  10kHz  1MHz   Vdo   Imax
-    "LT3070":    {"type":"ldo","rth_ja":34.0,"psrr":[74,65,40],"vdo":0.30,"i_max":4.0},
-    "ADP1763":   {"type":"ldo","rth_ja":40.0,"psrr":[80,70,48],"vdo":0.35,"i_max":1.0},
-    "ADP7159":   {"type":"ldo","rth_ja":62.0,"psrr":[75,68,52],"vdo":0.20,"i_max":0.5},
-    "TPS737":    {"type":"ldo","rth_ja":45.0,"psrr":[72,60,38],"vdo":0.50,"i_max":1.0},
-    "TPS73701DCQ":{"type":"ldo","rth_ja":45.0,"psrr":[72,60,38],"vdo":0.50,"i_max":1.0},
-    "TPS7A85A":  {"type":"ldo","rth_ja":25.0,"psrr":[78,72,60],"vdo":0.25,"i_max":4.0},
+    # LDO Regulators              rth    100Hz  10kHz  1MHz   Vdo   Imax  channels
+    "LT3070":    {"type":"ldo","rth_ja":34.0,"psrr":[74,65,40],"vdo":0.30,"i_max":4.0, "channels":1},
+    "ADP1763":   {"type":"ldo","rth_ja":40.0,"psrr":[80,70,48],"vdo":0.35,"i_max":1.0, "channels":1},
+    "ADP7159":   {"type":"ldo","rth_ja":62.0,"psrr":[75,68,52],"vdo":0.20,"i_max":0.5, "channels":1},
+    "TPS737":    {"type":"ldo","rth_ja":45.0,"psrr":[72,60,38],"vdo":0.50,"i_max":1.0, "channels":1},
+    "TPS73701DCQ":{"type":"ldo","rth_ja":45.0,"psrr":[72,60,38],"vdo":0.50,"i_max":1.0, "channels":1},
+    "TPS7A85A":  {"type":"ldo","rth_ja":25.0,"psrr":[78,72,60],"vdo":0.25,"i_max":4.0, "channels":1},
 }
 
 def resolve_spec(name: str) -> dict:
