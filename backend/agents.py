@@ -280,6 +280,7 @@ TOPOLOGY RULES:
 1. Each Buck takes its input directly from the main supply (Vin from requirements).
 2. Each LDO must take its input from one of the Buck output rails — choose the closest higher voltage rail that satisfies the dropout voltage.
 3. The "upstream_component" for an LDO = the part_name of the Buck feeding it.
+4. LDOs NEVER connect directly to VIN — always find a Buck output rail that provides the required input voltage.
 4. Assign switching_frequency from datasheet: LTM4638=1MHz, LTM4622=1.5MHz, LTM4630=800kHz, LTM4650=600kHz, LTM4655=1MHz, LTM4671=1MHz, LTM4675=800kHz, LTM4680=500kHz, TPSM82866A=2.2MHz. Default=1MHz.
 5. LDOs have no switching frequency — use the upstream Buck's frequency.
 6. For MULTI-OUTPUT Buck converters (channels > 1):

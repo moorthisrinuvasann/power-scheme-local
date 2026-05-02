@@ -81,19 +81,42 @@ def generate_mermaid_from_rails(rail_assignments: List[Dict[str, Any]]) -> str:
         src = "VIN"
 
         # If LDO with upstream, find its node
+        # LDOs must always connect to a Buck output, never directly to VIN
         if ctype == "ldo" and upstream:
             v_in = ra.get("v_in", 12)
-            # Find the Buck rail that provides the LDO's input voltage
+            # First: find exact voltage match
             for ra2 in rail_assignments or []:
                 if ra2.get("component") == upstream:
-                    # Check if this Buck's output voltage matches the LDO's input voltage
                     if abs(float(ra2.get("v_out", 0)) - v_in) < 0.1:
                         upstream_instance = ra2.get("instance_num", 1)
                         upstream_key = (upstream, upstream_instance)
                         if upstream_key in comp_instance_node_map:
                             src = comp_instance_node_map[upstream_key]
                             break
-            # If no matching Buck found, LDO connects to VIN directly
+            # Second: if no exact match, find Buck with closest higher voltage output
+            if src == "VIN":
+                best_match = None
+                best_diff = float('inf')
+                for ra2 in rail_assignments or []:
+                    if ra2.get("component") == upstream:
+                        v_out = float(ra2.get("v_out", 0))
+                        if v_out >= v_in and (v_out - v_in) < best_diff:
+                            best_diff = v_out - v_in
+                            best_match = ra2
+                if best_match:
+                    upstream_instance = best_match.get("instance_num", 1)
+                    upstream_key = (upstream, upstream_instance)
+                    if upstream_key in comp_instance_node_map:
+                        src = comp_instance_node_map[upstream_key]
+            # Third: if still no match, connect to first instance of upstream component
+            if src == "VIN":
+                for ra2 in rail_assignments or []:
+                    if ra2.get("component") == upstream:
+                        upstream_instance = ra2.get("instance_num", 1)
+                        upstream_key = (upstream, upstream_instance)
+                        if upstream_key in comp_instance_node_map:
+                            src = comp_instance_node_map[upstream_key]
+                            break
 
         # Connect component to rail
         lines.append(f'    {src} -->|"{vout}V {iout}A"| {node_id}["{label}"]')
