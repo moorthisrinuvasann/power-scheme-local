@@ -82,15 +82,18 @@ def generate_mermaid_from_rails(rail_assignments: List[Dict[str, Any]]) -> str:
 
         # If LDO with upstream, find its node
         if ctype == "ldo" and upstream:
-            # Find the instance of the upstream component
-            # Look for the first rail with the matching upstream component name
+            v_in = ra.get("v_in", 12)
+            # Find the Buck rail that provides the LDO's input voltage
             for ra2 in rail_assignments or []:
                 if ra2.get("component") == upstream:
-                    upstream_instance = ra2.get("instance_num", 1)
-                    upstream_key = (upstream, upstream_instance)
-                    if upstream_key in comp_instance_node_map:
-                        src = comp_instance_node_map[upstream_key]
-                        break
+                    # Check if this Buck's output voltage matches the LDO's input voltage
+                    if abs(float(ra2.get("v_out", 0)) - v_in) < 0.1:
+                        upstream_instance = ra2.get("instance_num", 1)
+                        upstream_key = (upstream, upstream_instance)
+                        if upstream_key in comp_instance_node_map:
+                            src = comp_instance_node_map[upstream_key]
+                            break
+            # If no matching Buck found, LDO connects to VIN directly
 
         # Connect component to rail
         lines.append(f'    {src} -->|"{vout}V {iout}A"| {node_id}["{label}"]')
