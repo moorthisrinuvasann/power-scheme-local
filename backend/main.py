@@ -219,6 +219,7 @@ async def generate_scheme(file: UploadFile = File(...), api_key: str = Form(...)
             agent1_schemes = agent1.get("schemes", [])
 
             for i, scheme in enumerate(schemes):
+                # Store LLM's Mermaid as fallback
                 scheme["schematics_mermaid"] = mermaid_codes[i] if i < len(mermaid_codes) else ""
 
                 if i < len(agent1_schemes):
@@ -274,6 +275,9 @@ async def generate_scheme(file: UploadFile = File(...), api_key: str = Form(...)
                     if channels == 1:
                         comp_instance_map[key] += 1
                     # For multi-output, all channels share the same instance number
+
+                # Re-generate Mermaid diagram with correct instance numbers
+                scheme["schematics_mermaid"] = generate_mermaid_from_rails(rail_assignments)
 
                 scheme["rail_analysis"] = calculate_all_rails(rail_assignments, req_params)
 
