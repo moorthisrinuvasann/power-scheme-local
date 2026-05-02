@@ -14,8 +14,8 @@ COMPONENT_SPECS = {
     "LTM4622IV": {"type":"buck","vin_range":(3.6,17.0),"f_sw_hz":1.5e6,"l_uh":1.0,"c_out_uf":22,  "rth_ja":10.0,"eta":0.90,"i_max":4.0, "esr_mohm":12, "channels":1},
     "LTM4630":   {"type":"buck","vin_range":(4.5,15.0),"f_sw_hz":800e3,"l_uh":1.5,"c_out_uf":100, "rth_ja":5.0, "eta":0.93,"i_max":15.0,"esr_mohm":6, "channels":1},
     "LTM4630A":  {"type":"buck","vin_range":(4.5,15.0),"f_sw_hz":800e3,"l_uh":1.5,"c_out_uf":100, "rth_ja":5.0, "eta":0.93,"i_max":15.0,"esr_mohm":6, "channels":1},
-    "LTM4650":   {"type":"buck","vin_range":(4.5,20.0),"f_sw_hz":600e3,"l_uh":1.5,"c_out_uf":220, "rth_ja":4.0, "eta":0.93,"i_max":25.0,"esr_mohm":5, "channels":1},
-    "LTM4650-1": {"type":"buck","vin_range":(4.5,15.0),"f_sw_hz":600e3,"l_uh":1.5,"c_out_uf":220, "rth_ja":4.0, "eta":0.93,"i_max":25.0,"esr_mohm":5, "channels":1},
+    "LTM4650":   {"type":"buck","vin_range":(4.5,15.0),"f_sw_hz":600e3,"l_uh":1.5,"c_out_uf":220, "rth_ja":4.0, "eta":0.93,"i_max":25.0,"esr_mohm":5, "channels":1},
+    "LTM4650-1": {"type":"buck","vin_range":(4.5,20.0),"f_sw_hz":600e3,"l_uh":1.5,"c_out_uf":220, "rth_ja":4.0, "eta":0.93,"i_max":25.0,"esr_mohm":5, "channels":1},
     "LTM4655":   {"type":"buck","vin_range":(4.5,20.0),"f_sw_hz":1e6,  "l_uh":1.5,"c_out_uf":47,  "rth_ja":6.5, "eta":0.92,"i_max":15.0,"esr_mohm":8, "channels":1},
     "LTM4671":   {"type":"buck","vin_range":(5.0,20.0),"f_sw_hz":1e6,  "l_uh":1.0,"c_out_uf":22,  "rth_ja":12.0,"eta":0.90,"i_max":12.0,"esr_mohm":12, "channels":4},  # Quad-output (dual 12A + dual 5A)
     "LTM4675":   {"type":"buck","vin_range":(5.75,17.0),"f_sw_hz":800e3,"l_uh":1.5,"c_out_uf":100, "rth_ja":5.5, "eta":0.92,"i_max":13.0,"esr_mohm":7, "channels":2},  # Dual-output
